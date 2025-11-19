@@ -1,1 +1,4 @@
-pip freeze > requirements.txt
+nba_api
+pandas
+boto3
+

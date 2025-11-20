@@ -19,6 +19,7 @@ from datetime import datetime, date
 from typing import List
 
 import pandas as pd
+import numpy as np 
 from nba_api.stats.endpoints import leaguegamelog
 
 from config_aws import LOCAL_DATA_DIR
@@ -34,6 +35,7 @@ CUTOFF_DATE = date.today()
 # Only keep columns needed for modeling
 KEEP_COLS = [
     "SEASON_ID",
+    "SEASON_TYPE",
     "GAME_ID",
     "GAME_DATE",
     "TEAM_ID",
@@ -60,6 +62,7 @@ KEEP_COLS = [
     "PF",
     "PLUS_MINUS",
 ]
+
 
 # ---------------- Season helpers -------------------
 
@@ -121,16 +124,38 @@ def fetch_logs_for_season(
 
 
 def clean_logs(df: pd.DataFrame) -> pd.DataFrame:
-    """Select required columns and normalize GAME_DATE."""
+    """Select required columns, normalize GAME_DATE, add SEASON & shooting %."""
     if df.empty:
         return df
+
+    # 只保留需要的原始列
     cols = [c for c in KEEP_COLS if c in df.columns]
     clean = df[cols].copy()
 
+    # 规范日期类型
     if "GAME_DATE" in clean.columns:
         clean["GAME_DATE"] = pd.to_datetime(clean["GAME_DATE"])
 
+    # =====✨ 新增 1：从 SEASON_ID 生成更好看的 SEASON（如 '2022-23'） =====
+    if "SEASON_ID" in clean.columns:
+        start_year = clean["SEASON_ID"].astype(str).str[:4].astype(int)
+        clean["SEASON"] = (
+            start_year.astype(str)
+            + "-"
+            + (start_year + 1).astype(str).str[-2:]
+        )
+
+    # =====✨ 新增 2：计算命中率列 FG_PCT / FG3_PCT / FT_PCT =====
+    # 用 replace({0: np.nan}) 避免除以 0
+    if "FGM" in clean.columns and "FGA" in clean.columns:
+        clean["FG_PCT"] = clean["FGM"] / clean["FGA"].replace({0: np.nan})
+    if "FG3M" in clean.columns and "FG3A" in clean.columns:
+        clean["FG3_PCT"] = clean["FG3M"] / clean["FG3A"].replace({0: np.nan})
+    if "FTM" in clean.columns and "FTA" in clean.columns:
+        clean["FT_PCT"] = clean["FTM"] / clean["FTA"].replace({0: np.nan})
+
     return clean
+
 
 
 # ---------------- Public API: build_datasets -------------------

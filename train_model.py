@@ -39,13 +39,24 @@ from config_aws import AWS_REGION, S3_BUCKET, S3_PREFIX, LOCAL_DATA_DIR
 
 # ================== 配置区域（你可以根据自己数据改） ==================
 
-# TODO: 把这个改成你特征文件中的标签列名
-LABEL_COL = "WIN"
-  # 比如你可以用 "WIN" 或 "HOME_WIN" 等
+# 标签列
+LABEL_COL = "WIN"  # 比如你可以用 "WIN" 或 "HOME_WIN" 等
 
-# TODO: 如果你想明确指定哪些列是特征，可以写一个列表；
-#      否则默认：丢掉非数值列 + LABEL_COL，只用数值列训练。
-EXPLICIT_FEATURE_COLS: List[str] | None = None
+# 训练 / 预测统一使用的特征列
+# 这些名字要和 build_team_features 里生成的列一致
+FEATURE_COLUMNS: List[str] = [
+    "roll5_PTS_FOR",
+    "roll5_PTS_AGAINST",
+    "roll5_point_diff",
+    "roll10_PTS_FOR",
+    "roll10_point_diff",
+    "roll10_win_rate",
+    "season_win_rate",
+]
+
+# 如果你想明确指定哪些列是特征，就用这个列表；
+# 这里直接用 FEATURE_COLUMNS，方便 api_server 复用。
+EXPLICIT_FEATURE_COLS: List[str] | None = FEATURE_COLUMNS
 
 # 模型保存的本地目录
 MODEL_DIR = LOCAL_DATA_DIR / "models"
@@ -90,6 +101,7 @@ def _select_X_y(df: pd.DataFrame):
                 f"are missing in data: {missing}"
             )
         X = df[EXPLICIT_FEATURE_COLS]
+        print(f"[train_model] Using explicit feature columns: {EXPLICIT_FEATURE_COLS}")
     else:
         # 默认策略：只用数值列，并且排除标签列
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
@@ -200,10 +212,8 @@ def train_model(feature_paths: List[Union[str, Path]]) -> str:
 
 
 if __name__ == "__main__":
-    # 可选：本地调试时，你可以硬编码一个特征路径测试
-    example_path = LOCAL_DATA_DIR / "team_features_all.csv"
-    if example_path.exists():
-        train_model([example_path])
-    else:
-        print(f"[INFO] Example feature file {example_path} not found. "
-              f"Call train_model() from run_daily_training.py instead.")
+    print(
+        "[INFO] train_model.py is intended to be called from "
+        "run_daily_training.py with feature_paths."
+    )
+

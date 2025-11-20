@@ -1,4 +1,11 @@
-nba_api
 pandas
+numpy
+scikit-learn
+joblib
+requests
+nba_api
 boto3
+botocore
+python-dateutil
+pytz
 

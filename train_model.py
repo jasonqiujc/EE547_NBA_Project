@@ -40,7 +40,8 @@ from config_aws import AWS_REGION, S3_BUCKET, S3_PREFIX, LOCAL_DATA_DIR
 # ================== 配置区域（你可以根据自己数据改） ==================
 
 # TODO: 把这个改成你特征文件中的标签列名
-LABEL_COL = "TARGET"  # 比如你可以用 "WIN" 或 "HOME_WIN" 等
+LABEL_COL = "WIN"
+  # 比如你可以用 "WIN" 或 "HOME_WIN" 等
 
 # TODO: 如果你想明确指定哪些列是特征，可以写一个列表；
 #      否则默认：丢掉非数值列 + LABEL_COL，只用数值列训练。

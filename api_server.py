@@ -45,6 +45,9 @@ from train_model import FEATURE_COLUMNS  # 假设你在 train_model 里有这个
 MODEL_KEY_LATEST = f"{S3_PREFIX}models/model_latest.pkl"
 LOCAL_MODEL_PATH = LOCAL_DATA_DIR / "model_latest.pkl"
 LOCAL_FEATURES_PATH = LOCAL_DATA_DIR / "team_game_features.csv"
+SCORE_MODEL_KEY_LATEST = f"{S3_PREFIX}models/score_model_latest.pkl"
+LOCAL_SCORE_MODEL_PATH = LOCAL_DATA_DIR / "score_model_latest.pkl"
+
 
 app = FastAPI(title="NBA Win Predictor API")
 
@@ -84,7 +87,14 @@ class HealthResponse(BaseModel):
 # ---------------- Model / Data Helpers ---------------- #
 
 _s3_client = boto3.client("s3", region_name=AWS_REGION)
-_model_cache = {"clf": None, "version": None, "last_error": None}
+_model_cache = {
+    "clf": None,
+    "clf_version": None,
+    "score_reg": None,
+    "score_version": None,
+    "last_error": None,
+}
+
 
 
 def download_latest_model() -> None:

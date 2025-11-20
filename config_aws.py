@@ -12,6 +12,7 @@ S3_BUCKET = "ee547-nba-project"
 S3_PREFIX = "datasets/nba_project/"
 
 # Local folder to store generated CSV files
-LOCAL_DATA_DIR = Path("data")
+PROJECT_ROOT = Path(__file__).resolve().parent
+LOCAL_DATA_DIR = PROJECT_ROOT / "data"
 LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
 

@@ -2,55 +2,113 @@
 # -*- coding: utf-8 -*-
 
 """
-run_daily_training.py
+run_daily_training.py (Enhanced)
 
-在 EC2 上定时运行的训练总控脚本。
+EC2 上每天运行的训练总控脚本。
 
-流程：
+新增功能（重要！）：
+  - 自动从 S3 合并历史主表 player_logs_all.csv 和最新增量 daily_xxx.csv
+  - 得到新的主表 player_logs_all.csv 并上传回 S3（覆盖旧表）
+
+随后流程：
   1. build_team_features.build_team_features()
-     - 从 S3 raw/ 读取历史 + 每日增量
-     - 生成特征 CSV 并保存在本地 data/
-  2. train_model.train_model(feature_paths)
-     - 训练“胜率模型”（分类）
-     - 保存到 data/models/model_latest.pkl
-     - 上传到 S3 的 models/model_latest.pkl
-  3. train_score_model.train_score_model(feature_paths)
-     - 训练“比分模型”（回归，预测 PTS_FOR）
-     - 保存到 data/models/score_model_latest.pkl
-     - 上传到 S3 的 models/score_model_latest.pkl
+  2. train_model.train_model()
+  3. train_score_model.train_score_model()
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Union
 
-from config_aws import S3_BUCKET, S3_PREFIX
+import boto3
+import pandas as pd
+
+from config_aws import S3_BUCKET, S3_PREFIX, AWS_REGION
 from build_team_features import build_team_features
 from train_model import train_model
 from train_score_model import train_score_model
 
 
+# ===============================================================
+#  新增：合并历史主表 + 昨天增量
+# ===============================================================
+
+def update_master_player_logs():
+    """从 S3 拉历史主表 + 昨天增量，合并成新的主表并上传回 S3。"""
+    print("========== [run_daily_training] Updating master player logs ==========")
+
+    s3 = boto3.client("s3", region_name=AWS_REGION)
+
+    # 昨天日期
+    yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+    daily_fname = f"player_logs_daily_{yesterday.replace('-', '')}.csv"
+
+    # S3 key
+    master_key = f"{S3_PREFIX}raw/player_logs_all.csv"
+    daily_key = f"{S3_PREFIX}raw/{daily_fname}"
+
+    tmp_dir = Path("/tmp")
+    tmp_dir.mkdir(exist_ok=True)
+
+    master_local = tmp_dir / "player_logs_all.csv"
+    daily_local = tmp_dir / daily_fname
+
+    # ----------- 下载历史主表 -----------
+    try:
+        s3.download_file(S3_BUCKET, master_key, str(master_local))
+        df_all = pd.read_csv(master_local)
+        print(f"Loaded master table from S3: {len(df_all)} rows.")
+    except Exception:
+        print("[INFO] Master table not found. Starting fresh.")
+        df_all = pd.DataFrame()
+
+    # ----------- 下载昨日增量 -----------
+    try:
+        s3.download_file(S3_BUCKET, daily_key, str(daily_local))
+        df_daily = pd.read_csv(daily_local)
+        print(f"Loaded daily increment {daily_fname}: {len(df_daily)} rows.")
+    except Exception:
+        print(f"[WARN] Missing daily file {daily_key}, skip update.")
+        return str(master_local)  # 用旧主表继续 pipeline
+
+    # ----------- 合并并去重 -----------
+    df_new = pd.concat([df_all, df_daily], ignore_index=True)
+
+    # 按你的数据结构，GAME_ID + PLAYER_ID 是唯一键
+    if {"GAME_ID", "PLAYER_ID"}.issubset(df_new.columns):
+        df_new.drop_duplicates(subset=["GAME_ID", "PLAYER_ID"], inplace=True)
+
+    print(f"Merged new master: {len(df_new)} rows total.")
+
+    # ----------- 保存并上传新主表 -----------
+    df_new.to_csv(master_local, index=False)
+    s3.upload_file(str(master_local), S3_BUCKET, master_key)
+    print(f"Updated master table uploaded to s3://{S3_BUCKET}/{master_key}")
+
+    return str(master_local)  # 返回新主表的本地路径
+
+
+# ===============================================================
+#  原有部分：构建特征 & 模型训练
+# ===============================================================
+
 def _normalize_feature_paths(feature_paths) -> List[Union[str, Path]]:
-    """
-    兼容几种常见返回格式：
-      - 单个 Path/str
-      - Path/str 列表
-    """
     if feature_paths is None:
         raise ValueError("build_team_features() returned None, expected path(s).")
-
     if isinstance(feature_paths, (str, Path)):
         return [feature_paths]
-
-    # 假设是可迭代列表
     return list(feature_paths)
 
 
 def main():
-    print("========== [run_daily_training] Step 1: Build team features ==========")
 
+    # ----------- 新增：先更新主表 -----------
+    master_local_path = update_master_player_logs()
+
+    print("\n========== [run_daily_training] Step 1: Build team features ==========")
     feature_paths = build_team_features()
     feature_paths = _normalize_feature_paths(feature_paths)
+
     print("[run_daily_training] Feature files:", feature_paths)
 
     # --------- Step 2: 胜率模型 ----------
@@ -71,4 +129,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

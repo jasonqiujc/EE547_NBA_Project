@@ -2,224 +2,251 @@
 # -*- coding: utf-8 -*-
 
 """
-Train a classification model to predict WIN for each team-game row,
-based on team-level rolling features produced by build_team_features.py.
+Fetch and CLEAN player game logs for:
+  - The last THREE full NBA seasons
+  - The CURRENT season up to a cutoff date (默认 = 昨天)
 
-Input:
-    - LOCAL_DATA_DIR / "team_game_features.csv"
+Produces:
+  - One cleaned CSV per full season
+  - One cleaned CSV for current partial season
+  - One merged CSV for all seasons combined
 
-Output:
-    - LOCAL_DATA_DIR / "model_YYYYMMDD.pkl"
-    - S3:  s3://{S3_BUCKET}/{S3_PREFIX}models/model_YYYYMMDD.pkl
-    - S3:  s3://{S3_BUCKET}/{S3_PREFIX}models/model_latest.pkl  (always latest)
-
-This file also defines FEATURE_COLUMNS so that api_server.py can import it.
+Designed for automated pipelines using boto3 + S3.
 """
 
 from __future__ import annotations
 
+import time
+from datetime import datetime, date, timedelta
 from pathlib import Path
-from datetime import datetime, timezone
+from typing import List
 
 import numpy as np
 import pandas as pd
-import boto3
-from sklearn.ensemble import RandomForestClassifier
-import joblib
+from nba_api.stats.endpoints import leaguegamelog
 
-from config_aws import LOCAL_DATA_DIR, AWS_REGION, S3_BUCKET, S3_PREFIX
+from config_aws import LOCAL_DATA_DIR
 
+# ---------------------- Config ----------------------
+INCLUDE_PLAYOFFS = True
+SLEEP_BETWEEN_CALLS = 1.5
+TIMEOUT = 30
 
-# ---------------- Config ---------------- #
+# 只作为文件名前缀，不带目录
+OUTPUT_PREFIX = "player_logs_clean"
 
-TEAM_FEATURES_FILENAME = "team_game_features.csv"
+# 截止到“昨天”的数据
+CUTOFF_DATE = date.today() - timedelta(days=1)
 
-# 训练使用的特征列（需要和 build_team_features 生成的列名对应）
-# 如果你之后在 build_team_features 里增加了新的 rolling 特征，
-# 可以在这里补充到这个列表中。
-FEATURE_COLUMNS = [
-    "roll5_PTS_FOR",
-    "roll5_PTS_AGAINST",
-    "roll5_point_diff",
-    "roll10_PTS_FOR",
-    "roll10_point_diff",
-    "roll10_win_rate",
-    "season_win_rate",
+# Only keep columns needed for modeling
+KEEP_COLS = [
+    "SEASON_ID",
+    "SEASON_TYPE",
+    "GAME_ID",
+    "GAME_DATE",
+    "TEAM_ID",
+    "TEAM_ABBREVIATION",
+    "PLAYER_ID",
+    "PLAYER_NAME",
+    "MATCHUP",
+    "WL",
+    "MIN",
+    "PTS",
+    "REB",
+    "AST",
+    "FGM",
+    "FGA",
+    "FG3M",
+    "FG3A",
+    "FTM",
+    "FTA",
+    "OREB",
+    "DREB",
+    "STL",
+    "BLK",
+    "TOV",
+    "PF",
+    "PLUS_MINUS",
 ]
 
 
-# ---------------- Helpers ---------------- #
-
-def _now_str() -> str:
-    """Return a timestamp prefix '[YYYY-MM-DD HH:MM:SS]' for logs."""
-    return datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+# ---------------- Season helpers -------------------
 
 
-def load_team_features(path: Path | str | None = None) -> pd.DataFrame:
+def current_nba_season_start_year(today: date) -> int:
     """
-    Load team-level game features CSV.
+    Determine NBA season start year based on date.
 
-    Parameters
-    ----------
-    path : Path or str or None
-        If None, loads from LOCAL_DATA_DIR / TEAM_FEATURES_FILENAME.
-
-    Returns
-    -------
-    df : pd.DataFrame
+    Season starts in October.
+    If month >= 10 → season_start_year = this year
+    Else → season_start_year = last year
     """
-    if path is None:
-        path = LOCAL_DATA_DIR / TEAM_FEATURES_FILENAME
+    if today.month >= 10:
+        return today.year
     else:
-        path = Path(path)
-
-    print(f"{_now_str()} Loading team features from: {path}")
-    if not path.exists():
-        raise FileNotFoundError(f"Team features file not found: {path}")
-
-    df = pd.read_csv(path)
-    if "GAME_DATE" in df.columns:
-        df["GAME_DATE"] = pd.to_datetime(df["GAME_DATE"])
-
-    return df
+        return today.year - 1
 
 
-def prepare_dataset(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
+def format_season(start_year: int) -> str:
+    """Convert e.g., 2022 → '2022-23'"""
+    return f"{start_year}-{str((start_year + 1) % 100).zfill(2)}"
+
+
+def last_n_full_seasons(n: int, today: date) -> List[str]:
+    """Return last N *full* seasons (not including current)."""
+    cur_start = current_nba_season_start_year(today)
+    seasons: List[str] = []
+    for i in range(1, n + 1):
+        seasons.append(format_season(cur_start - i))
+    return seasons
+
+
+# ---------------- Fetch helpers -------------------
+
+
+def fetch_logs_for_season(
+    season: str,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> pd.DataFrame:
     """
-    Prepare X, y for training.
+    Fetch logs for a single season.
 
-    Assumes:
-      - Target column is 'WIN' (1 if team won, 0 otherwise).
-      - FEATURE_COLUMNS exist in df.
+    If date_from/date_to are provided, they will be passed to the API.
     """
-    missing = [c for c in FEATURE_COLUMNS if c not in df.columns]
-    if missing:
-        raise ValueError(f"Missing feature columns in team features: {missing}")
+    frames: List[pd.DataFrame] = []
 
-    if "WIN" not in df.columns:
-        raise ValueError("Team features must contain 'WIN' column as label.")
+    season_types = ["Regular Season", "Playoffs"] if INCLUDE_PLAYOFFS else ["Regular Season"]
 
-    # 只保留有完整特征的样本
-    df_model = df.dropna(subset=FEATURE_COLUMNS + ["WIN"]).copy()
+    for stype in season_types:
+        print(f"  - Fetching {season} / {stype} ...")
+        resp = leaguegamelog.LeagueGameLog(
+            player_or_team_abbreviation="P",
+            season=season,
+            season_type_all_star=stype,
+            date_from_nullable=date_from,
+            date_to_nullable=date_to,
+            timeout=TIMEOUT,
+        )
+        df = resp.get_data_frames()[0]
+        df["SEASON_STR"] = season
+        df["SEASON_TYPE"] = stype
+        frames.append(df)
+        time.sleep(SLEEP_BETWEEN_CALLS)
 
-    print(f"{_now_str()} Training samples after dropna: {len(df_model)}")
-    if len(df_model) == 0:
-        raise ValueError("No valid samples for training after dropna.")
-
-    X = df_model[FEATURE_COLUMNS].astype(float)
-    y = df_model["WIN"].astype(int)
-
-    return X, y
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
-def build_model() -> RandomForestClassifier:
+def clean_logs(df: pd.DataFrame) -> pd.DataFrame:
+    """Select required columns, normalize GAME_DATE, add SEASON & shooting %."""
+    if df.empty:
+        return df
+
+    # 只保留需要的原始列
+    cols = [c for c in KEEP_COLS if c in df.columns]
+    clean = df[cols].copy()
+
+    # 规范日期类型
+    if "GAME_DATE" in clean.columns:
+        clean["GAME_DATE"] = pd.to_datetime(clean["GAME_DATE"])
+
+    # 从 SEASON_ID 生成更好看的 SEASON（如 '2022-23'）
+    if "SEASON_ID" in clean.columns:
+        start_year = clean["SEASON_ID"].astype(str).str[:4].astype(int)
+        clean["SEASON"] = (
+            start_year.astype(str)
+            + "-"
+            + (start_year + 1).astype(str).str[-2:]
+        )
+
+    # 计算命中率列 FG_PCT / FG3_PCT / FT_PCT
+    if "FGM" in clean.columns and "FGA" in clean.columns:
+        clean["FG_PCT"] = clean["FGM"] / clean["FGA"].replace({0: np.nan})
+    if "FG3M" in clean.columns and "FG3A" in clean.columns:
+        clean["FG3_PCT"] = clean["FG3M"] / clean["FG3A"].replace({0: np.nan})
+    if "FTM" in clean.columns and "FTA" in clean.columns:
+        clean["FT_PCT"] = clean["FTM"] / clean["FTA"].replace({0: np.nan})
+
+    return clean
+
+
+# ---------------- Public API: build_datasets -------------------
+
+
+def build_datasets() -> List[Path]:
     """
-    Construct the RandomForest model with reasonable defaults.
-    """
-    clf = RandomForestClassifier(
-        n_estimators=300,
-        max_depth=None,
-        min_samples_split=2,
-        min_samples_leaf=1,
-        random_state=42,
-        n_jobs=-1,
-    )
-    return clf
-
-
-def save_model_local(clf: RandomForestClassifier) -> Path:
-    """
-    Save model locally under LOCAL_DATA_DIR / model_YYYYMMDD.pkl
-
-    Returns
-    -------
-    local_path : Path
+    Full pipeline:
+      Fetch → Clean → Save CSVs
+    Returns list of generated file paths.
     """
     LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
-    filename = f"model_{date_str}.pkl"
-    local_path = LOCAL_DATA_DIR / filename
+    today = CUTOFF_DATE  # 默认为“昨天”
+    full_seasons = last_n_full_seasons(3, today)
+    current_season = format_season(current_nba_season_start_year(today))
 
-    print(f"{_now_str()} Saving model locally to: {local_path}")
-    with open(local_path, "wb") as f:
-        joblib.dump(clf, f)
+    print(f"Full seasons: {full_seasons}")
+    print(f"Current season: {current_season}, cutoff={today.isoformat()}")
 
-    return local_path
+    all_frames: List[pd.DataFrame] = []
+    output_paths: List[Path] = []
 
+    # --- Full seasons (完整三季) ---
+    for s in full_seasons:
+        raw = fetch_logs_for_season(s)
+        if raw.empty:
+            print(f"[WARN] No data for season {s}")
+            continue
 
-def upload_model_to_s3(local_path: Path) -> tuple[str, str]:
-    """
-    Upload local model file to S3, both dated version and 'latest'.
+        clean = clean_logs(raw)
+        out_path = LOCAL_DATA_DIR / f"{OUTPUT_PREFIX}_season_{s.replace('-', '')}.csv"
+        clean.to_csv(out_path, index=False)
+        print(f"[Saved] Season {s}: {out_path}  rows={len(clean)}")
 
-    Returns
-    -------
-    s3_uri_dated : str
-    s3_uri_latest : str
-    """
-    s3 = boto3.client("s3", region_name=AWS_REGION)
+        all_frames.append(clean)
+        output_paths.append(out_path)
 
-    # Dated key is derived from filename
-    filename = local_path.name  # e.g., 'model_20251120.pkl'
-    key_dated = f"{S3_PREFIX}models/{filename}"
-    key_latest = f"{S3_PREFIX}models/model_latest.pkl"
+    # --- Current season partial (本赛季截至 cutoff=昨天) ---
+    # 简单稳妥：抓整季，然后在本地用 GAME_DATE 截断
+    cur_raw = fetch_logs_for_season(current_season)
 
-    print(f"{_now_str()} Uploading to S3 (dated): s3://{S3_BUCKET}/{key_dated}")
-    s3.upload_file(str(local_path), S3_BUCKET, key_dated)
+    if not cur_raw.empty:
+        cur_clean = clean_logs(cur_raw)
 
-    print(f"{_now_str()} Uploading to S3 (latest): s3://{S3_BUCKET}/{key_latest}")
-    s3.upload_file(str(local_path), S3_BUCKET, key_latest)
+        # 只保留 GAME_DATE <= cutoff（也就是昨天）
+        if "GAME_DATE" in cur_clean.columns:
+            cur_clean = cur_clean[cur_clean["GAME_DATE"].dt.date <= today]
 
-    s3_uri_dated = f"s3://{S3_BUCKET}/{key_dated}"
-    s3_uri_latest = f"s3://{S3_BUCKET}/{key_latest}"
-    return s3_uri_dated, s3_uri_latest
+        out_cur = LOCAL_DATA_DIR / (
+            f"{OUTPUT_PREFIX}_current_{current_season.replace('-', '')}"
+            f"_to_{today.strftime('%Y%m%d')}.csv"
+        )
+        cur_clean.to_csv(out_cur, index=False)
+        print(f"[Saved] Current season: {out_cur}  rows={len(cur_clean)}")
 
+        all_frames.append(cur_clean)
+        output_paths.append(out_cur)
+    else:
+        print(f"[WARN] No data for current season {current_season}")
 
-# ---------------- Public API ---------------- #
+    # --- Merge all ---
+    if all_frames:
+        merged = pd.concat(all_frames, ignore_index=True)
+        out_all = LOCAL_DATA_DIR / (
+            f"{OUTPUT_PREFIX}_all_3seasons_plus_current_to_{today.strftime('%Y%m%d')}.csv"
+        )
+        merged.to_csv(out_all, index=False)
+        print(f"[Saved] Merged all seasons: {out_all}  rows={len(merged)}")
 
-def train_model(team_features_path: Path | str | None = None) -> str:
-    """
-    Main entry for training pipeline.
+        output_paths.append(out_all)
+    else:
+        print("[WARN] No data fetched at all.")
 
-    Parameters
-    ----------
-    team_features_path : optional Path or str
-        If None, uses LOCAL_DATA_DIR / TEAM_FEATURES_FILENAME.
-
-    Returns
-    -------
-    s3_uri_latest : str
-        S3 URI of the 'model_latest.pkl'.
-    """
-    print(f"{_now_str()} Start training...")
-
-    # 1) Load data
-    df = load_team_features(team_features_path)
-
-    # 2) Prepare X, y
-    X, y = prepare_dataset(df)
-
-    print(f"{_now_str()} Feature shape: X={X.shape}, y={y.shape}")
-
-    # 3) Build model
-    clf = build_model()
-
-    # 4) Fit
-    clf.fit(X, y)
-    print(f"{_now_str()} Model fitting done.")
-
-    # 5) Save locally
-    local_model_path = save_model_local(clf)
-
-    # 6) Upload to S3
-    s3_uri_dated, s3_uri_latest = upload_model_to_s3(local_model_path)
-
-    print(f"{_now_str()} Training complete.")
-    print(f"New model uploaded to: {s3_uri_dated}")
-    print(f"Latest model at:       {s3_uri_latest}")
-
-    return s3_uri_latest
+    return output_paths
 
 
 if __name__ == "__main__":
-    train_model()
+    paths = build_datasets()
+    print("\nGenerated files:")
+    for p in paths:
+        print(" -", p)

@@ -54,14 +54,12 @@ app.add_middleware(
 # -------------------- Pydantic models -------------------- #
 
 class GameResult(BaseModel):
-    game_id: str
     game_date: str
     home_team: str
     away_team: str
-    home_team_id: int
-    away_team_id: int
-    home_score: Optional[int]
-    away_score: Optional[int]
+    home_score: int
+    away_score: int
+
 
 
 class GamePrediction(BaseModel):
@@ -324,44 +322,44 @@ def health():
 def get_yesterday_games():
     """
     返回昨天的赛程 + 比赛结果。
+
+    适配当前的 games_yesterday_YYYYMMDD.csv 结构：
+      GAME_DATE, HOME_TEAM, AWAY_TEAM, HOME_SCORE, AWAY_SCORE
     """
     try:
         df = _load_yesterday_games_df()
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Yesterday games file not found.")
 
-    # 根据你的 CSV 列名映射成统一字段
-    # 这里假设列名：
-    #   GAME_ID, GAME_DATE,
-    #   HOME_TEAM_ABBREVIATION, VISITOR_TEAM_ABBREVIATION,
-    #   HOME_TEAM_ID, VISITOR_TEAM_ID,
-    #   PTS_HOME, PTS_AWAY
     required_cols = [
-        "GAME_ID", "GAME_DATE",
-        "HOME_TEAM_ABBREVIATION", "VISITOR_TEAM_ABBREVIATION",
-        "HOME_TEAM_ID", "VISITOR_TEAM_ID",
-        "PTS_HOME", "PTS_AWAY",
+        "GAME_DATE",
+        "HOME_TEAM",
+        "AWAY_TEAM",
+        "HOME_SCORE",
+        "AWAY_SCORE",
     ]
     missing = [c for c in required_cols if c not in df.columns]
     if missing:
-        raise HTTPException(status_code=500, detail=f"games_yesterday CSV missing columns: {missing}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"games_yesterday CSV missing columns: {missing}",
+        )
 
+    # 统一日期格式
     df["GAME_DATE"] = pd.to_datetime(df["GAME_DATE"]).dt.strftime("%Y-%m-%d")
 
-    results = []
+    results: List[GameResult] = []
     for _, row in df.iterrows():
         results.append(
             GameResult(
-                game_id=str(row["GAME_ID"]),
                 game_date=row["GAME_DATE"],
-                home_team=row["HOME_TEAM_ABBREVIATION"],
-                away_team=row["VISITOR_TEAM_ABBREVIATION"],
-                home_team_id=int(row["HOME_TEAM_ID"]),
-                away_team_id=int(row["VISITOR_TEAM_ID"]),
-                home_score=int(row["PTS_HOME"]),
-                away_score=int(row["PTS_AWAY"]),
+                home_team=str(row["HOME_TEAM"]),
+                away_team=str(row["AWAY_TEAM"]),
+                home_score=int(row["HOME_SCORE"]),
+                away_score=int(row["AWAY_SCORE"]),
             )
         )
+
     return results
 
 

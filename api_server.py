@@ -69,16 +69,16 @@ class GamePrediction(BaseModel):
     game_date: str
     home_team: str
     away_team: str
-    home_team_id: int
-    away_team_id: int
-    # 赛程里可能没有比分（未来比赛），所以是 Optional
+    home_team_id: Optional[int] = None
+    away_team_id: Optional[int] = None
+
     home_score: Optional[int] = None
     away_score: Optional[int] = None
 
-    # 模型预测
     home_win_prob: float
     away_win_prob: float
     predicted_point_diff: float  # home_score - away_score
+
 
 
 # -------------------- Helpers: dates & files -------------------- #
@@ -206,36 +206,40 @@ def load_model() -> Optional[object]:
 
 def predict_for_games(schedule_df: pd.DataFrame) -> pd.DataFrame:
     """
-    给未来赛程加上“假的”预测结果（不依赖模型）：
+    根据简单赛程表（只有 GAME_DATE / HOME_TEAM / AWAY_TEAM）生成“假的预测”。
 
-    - home_win_prob:  主队获胜概率（0.4 ~ 0.7 之间）
-    - away_win_prob:  客队获胜概率 = 1 - home_win_prob
-    - predicted_point_diff:  预测分差 = home_score - away_score，约在 -15 ~ +15 之间
+    必须包含的列：
+      - GAME_DATE
+      - HOME_TEAM
+      - AWAY_TEAM
 
-    为了保证每次返回的结果“稳定不变”，我们用：
-      - 固定随机种子
-      - 再加上 GAME_ID 的 hash 做偏移
-    这样相同的比赛每次调用 API 都会得到一致的预测值。
+    输出会多出：
+      - game_id（用日期+对阵拼出来的一个字符串）
+      - home_win_prob
+      - away_win_prob
+      - predicted_point_diff
     """
-
-    # 先确保这些列在你的 schedule CSV 里存在，列名可以根据你的实际调整
-    required_cols = [
-        "GAME_ID",
-        "GAME_DATE",
-        "HOME_TEAM_ABBREVIATION",
-        "VISITOR_TEAM_ABBREVIATION",
-        "HOME_TEAM_ID",
-        "VISITOR_TEAM_ID",
-    ]
+    required_cols = ["GAME_DATE", "HOME_TEAM", "AWAY_TEAM"]
     missing = [c for c in required_cols if c not in schedule_df.columns]
     if missing:
         raise ValueError(f"[api_server] schedule CSV is missing columns: {missing}")
 
-    # 确保 GAME_ID 是字符串，方便做 hash
-    schedule_df["GAME_ID"] = schedule_df["GAME_ID"].astype(str)
+    # 统一类型
+    schedule_df = schedule_df.copy()
+    schedule_df["GAME_DATE"] = pd.to_datetime(schedule_df["GAME_DATE"]).dt.strftime("%Y-%m-%d")
+    schedule_df["HOME_TEAM"] = schedule_df["HOME_TEAM"].astype(str)
+    schedule_df["AWAY_TEAM"] = schedule_df["AWAY_TEAM"].astype(str)
 
-    # 为了让同一场比赛的预测在多次请求中保持一致：
-    # 使用固定种子 + GAME_ID 的 hash 作为偏移
+    # 生成一个稳定的“伪 game_id”，保证同一场比赛每次请求都一样
+    schedule_df["game_id"] = (
+        schedule_df["GAME_DATE"]
+        + "_"
+        + schedule_df["HOME_TEAM"]
+        + "_vs_"
+        + schedule_df["AWAY_TEAM"]
+    )
+
+    # 下面是完全“假的预测”，但看起来比较合理
     base_rng = np.random.default_rng(seed=2025)
     base_random = base_rng.uniform(0.0, 1.0, size=len(schedule_df))
 
@@ -243,21 +247,15 @@ def predict_for_games(schedule_df: pd.DataFrame) -> pd.DataFrame:
     point_diffs = []
 
     for i, row in schedule_df.iterrows():
-        game_id = row["GAME_ID"]
+        game_key = row["game_id"]
+        # 用 hash 让每场比赛预测稳定不变
+        game_hash = hash(game_key)
+        game_hash_float = (game_hash % 10_000) / 10_000.0  # 映射到 [0,1)
 
-        # 基于 GAME_ID 生成一个小的偏移，这样不同比赛不会一模一样
-        game_hash = hash(game_id)  # Python 内置 hash
-        # 映射到 [0, 1)
-        game_hash_float = (game_hash % 10_000) / 10_000.0
-
-        # 基础概率在 0.4 ~ 0.7 之间波动，看起来比较合理
-        # 加一点随机噪声，再截断到 [0.4, 0.7]
         raw_prob = 0.5 + (game_hash_float - 0.5) * 0.5 + (base_random[i] - 0.5) * 0.1
-        home_prob = float(np.clip(raw_prob, 0.4, 0.7))
+        home_prob = float(np.clip(raw_prob, 0.4, 0.7))  # 限制在 0.4~0.7 之间
 
-        # 分差大致在 -15~+15 之间
-        # home_prob > 0.5 → 正分差，home_prob < 0.5 → 负分差
-        point_diff = (home_prob - 0.5) * 30.0  # 0.2 * 30 ≈ 6 分的优势
+        point_diff = (home_prob - 0.5) * 30.0  # 映射成大约 -15~+15 分
 
         home_win_probs.append(home_prob)
         point_diffs.append(point_diff)
@@ -370,45 +368,43 @@ def get_yesterday_games():
 @app.get("/upcoming", response_model=List[GamePrediction])
 def get_upcoming_with_predictions(days: int = 5):
     """
-    返回今天开始未来 5 天的赛程 + 预测。
-    可通过 query 参数调整天数，如 /upcoming?days=3
+    返回今天开始未来 N 天的赛程 + 预测。
+    赛程 CSV 只需要包含：GAME_DATE / HOME_TEAM / AWAY_TEAM
     """
     try:
         schedule_df = _load_upcoming_schedule_df(days=days)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-    # 做预测（当前是 dummy 实现，需要你之后替换成真实模型逻辑）
+    # 做预测（假的）
     try:
         schedule_with_pred = predict_for_games(schedule_df.copy())
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    # 统一格式返回
     required_cols = [
-        "GAME_ID", "GAME_DATE",
-        "HOME_TEAM_ABBREVIATION", "VISITOR_TEAM_ABBREVIATION",
-        "HOME_TEAM_ID", "VISITOR_TEAM_ID",
-        "home_win_prob", "away_win_prob", "predicted_point_diff",
+        "game_id",
+        "GAME_DATE",
+        "HOME_TEAM",
+        "AWAY_TEAM",
+        "home_win_prob",
+        "away_win_prob",
+        "predicted_point_diff",
     ]
     missing = [c for c in required_cols if c not in schedule_with_pred.columns]
     if missing:
         raise HTTPException(status_code=500, detail=f"schedule+prediction missing columns: {missing}")
 
-    schedule_with_pred["GAME_DATE"] = pd.to_datetime(
-        schedule_with_pred["GAME_DATE"]
-    ).dt.strftime("%Y-%m-%d")
-
     preds: List[GamePrediction] = []
     for _, row in schedule_with_pred.iterrows():
         preds.append(
             GamePrediction(
-                game_id=str(row["GAME_ID"]),
+                game_id=str(row["game_id"]),
                 game_date=row["GAME_DATE"],
-                home_team=row["HOME_TEAM_ABBREVIATION"],
-                away_team=row["VISITOR_TEAM_ABBREVIATION"],
-                home_team_id=int(row["HOME_TEAM_ID"]),
-                away_team_id=int(row["VISITOR_TEAM_ID"]),
+                home_team=row["HOME_TEAM"],
+                away_team=row["AWAY_TEAM"],
+                home_team_id=None,
+                away_team_id=None,
                 home_score=None,
                 away_score=None,
                 home_win_prob=float(row["home_win_prob"]),
@@ -417,4 +413,5 @@ def get_upcoming_with_predictions(days: int = 5):
             )
         )
     return preds
+
 

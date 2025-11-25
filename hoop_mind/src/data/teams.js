@@ -19,6 +19,7 @@ const teams = [
   { name: "Minnesota Timberwolves", abbrev: "MIN", logo: "https://a.espncdn.com/i/teamlogos/nba/500/min.png", id: 16 },
   { name: "New Orleans Pelicans", abbrev: "NO", logo: "https://a.espncdn.com/i/teamlogos/nba/500/no.png", id: 23 },
   { name: "New York Knicks", abbrev: "NYK", logo: "https://a.espncdn.com/i/teamlogos/nba/500/ny.png", id: 6 },
+  { name: "New York Knicks", abbrev: "NY", logo: "https://a.espncdn.com/i/teamlogos/nba/500/ny.png", id: 6 },
   { name: "Oklahoma City Thunder", abbrev: "OKC", logo: "https://a.espncdn.com/i/teamlogos/nba/500/okc.png", id: 18},
   { name: "Orlando Magic", abbrev: "ORL", logo: "https://a.espncdn.com/i/teamlogos/nba/500/orl.png", id: 5 },
   { name: "Philadelphia 76ers", abbrev: "PHI", logo: "https://a.espncdn.com/i/teamlogos/nba/500/phi.png", id: 7 },

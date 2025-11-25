@@ -1,7 +1,7 @@
 // src/App.jsx
 import { useEffect, useState } from "react";
 import teams from "../data/teams";
-import predict from "../data/predict";
+import PredictionModal from "./PredictionModal";
 import Modal from "./Modal";
 
 const API_KEY = import.meta.env.VITE_SPORTS_DATA_IO_KEY;
@@ -105,13 +105,13 @@ function App() {
 
       {/* Recent Finals */}
       <section style={{ marginBottom: 40 }}>
-        <h1 style={{ fontSize: 30, marginBottom: 10 }}>Recent Final Games (Last 5)</h1>
+        <h1 style={{ fontSize: 30, marginBottom: 10 }}>Recent Final Games</h1>
         <GameGrid games={recentFinals} />
       </section>
 
       {/* Upcoming Scheduled */}
       <section>
-        <h1 style={{ fontSize: 30, marginBottom: 10 }}>Upcoming Scheduled Games (Next 5)</h1>
+        <h1 style={{ fontSize: 30, marginBottom: 10 }}>Upcoming Scheduled Games</h1>
         <GameGrid games={upcomingScheduled} />
       </section>
     </div>
@@ -126,16 +126,36 @@ function GameGrid({ games }) {
         return teams.find((t) => t.abbrev === abbrev) || {};
     }
 
-    function openWindow(game) {
-        const record = predict.find(
-        (r) =>
-            r.homeTeamAbbrev === game.HomeTeam &&
-            r.awayTeamAbbrev === game.AwayTeam &&
-            r.date === game.Day?.split("T")[0]
-        );
+    async function openWindow(game) {
+        const game_date = game.Day?.split("T")[0];
+        const home_team = game.HomeTeam;
+        const away_team = game.AwayTeam;
 
-        setSelectedDetail(record || { message: "No data available." });
+        // show loading inside modal
+        setSelectedDetail({ loading: true });
         setModalVisible(true);
+
+        try {
+            const res = await fetch("http://3.101.69.200:8000/predict", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    game_date,
+                    home_team,
+                    away_team
+                })
+            });
+
+            const data = await res.json();
+
+            setSelectedDetail(data);
+
+        } catch (err) {
+            console.error(err);
+            setSelectedDetail({ message: "Error fetching prediction." });
+        }
     }
 
     return (
@@ -255,26 +275,11 @@ function GameGrid({ games }) {
                     <div style={{ marginTop: 6 }}>{home.abbrev}</div>
                 </div>
                 </div>
-                <Modal visible={modalVisible} onClose={() => setModalVisible(false)}>
-                    {selectedDetail ? (
-                    <div>
-                        <h2 style={{ marginBottom: 10 }}>Game Details</h2>
-
-                        {selectedDetail.message ? (
-                        <p>{selectedDetail.message}</p>
-                        ) : (
-                        <>
-                            <p><strong>Date:</strong> {selectedDetail.date}</p>
-                            <p><strong>Home:</strong> {selectedDetail.homeTeamAbbrev}</p>
-                            <p><strong>Away:</strong> {selectedDetail.awayTeamAbbrev}</p>
-                            <p><strong>Home Win Rate:</strong> {selectedDetail.homeTeamWinRate}%</p>
-                            <p><strong>Away Win Rate:</strong> {selectedDetail.awayTeamWinRate}%</p>
-                            <p><strong>Home To Away Diff:</strong> {selectedDetail.homeToAwayDiff}</p>
-                        </>
-                        )}
-                    </div>
-                    ) : null}
-                </Modal>
+                <PredictionModal
+                  visible={modalVisible}
+                  onClose={() => setModalVisible(false)}
+                  detail={selectedDetail}
+                />
             </div>
             );
         })}

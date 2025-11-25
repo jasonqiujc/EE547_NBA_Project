@@ -148,7 +148,7 @@ def load_model() -> Optional[object]:
     try:
         LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
         s3_client = boto3.client("s3", region_name=AWS_REGION)
-        key = f"{S3_PREFIX}models/model_latest.pkl}"
+        key = f"{S3_PREFIX}models/model_latest.pkl"
         print(f"[api_server] Downloading model from S3: s3://{S3_BUCKET}/{key}")
         s3_client.download_file(S3_BUCKET, key, str(local_model_path))
         _model = joblib.load(local_model_path)

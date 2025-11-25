@@ -7,6 +7,7 @@ FastAPI server for NBA dashboard.
 提供给前端的数据：
   - 昨天的赛程 + 比分结果
   - 未来 5 天的赛程 + 预测结果（主队/客队胜率 + 预测分差）
+  - 单场比赛预测：给定 game_date + home_team + away_team，返回预测结果
 
 约定：
   - 昨天比赛结果文件：
@@ -15,9 +16,8 @@ FastAPI server for NBA dashboard.
       LOCAL_DATA_DIR / f"schedule_YYYYMMDD.csv"
 
 预测部分：
-  - 这里给出结构化代码，留了一个 TODO 给你把真实模型接进去：
-      - load_model()
-      - predict_for_games(schedule_df)
+  - 目前是“假预测”（根据 hash + 随机数生成稳定的概率和分差），
+    未来你可以在 fake_predict_single_game / predict_for_games 里接入真实模型。
 """
 
 from __future__ import annotations
@@ -61,7 +61,6 @@ class GameResult(BaseModel):
     away_score: int
 
 
-
 class GamePrediction(BaseModel):
     game_id: str
     game_date: str
@@ -77,6 +76,22 @@ class GamePrediction(BaseModel):
     away_win_prob: float
     predicted_point_diff: float  # home_score - away_score
 
+
+# ------ 单场预测用的请求 / 响应模型 ------ #
+
+class PredictionRequest(BaseModel):
+    game_date: str      # "2025-11-24"
+    home_team: str      # "LAL"
+    away_team: str      # "BOS"
+
+
+class PredictionResponse(BaseModel):
+    game_date: str
+    home_team: str
+    away_team: str
+    home_win_prob: float
+    away_win_prob: float
+    predicted_point_diff: float   # home - away
 
 
 # -------------------- Helpers: dates & files -------------------- #
@@ -133,7 +148,7 @@ def load_model() -> Optional[object]:
     try:
         LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
         s3_client = boto3.client("s3", region_name=AWS_REGION)
-        key = f"{S3_PREFIX}models/model_latest.pkl"
+        key = f"{S3_PREFIX}models/model_latest.pkl}"
         print(f"[api_server] Downloading model from S3: s3://{S3_BUCKET}/{key}")
         s3_client.download_file(S3_BUCKET, key, str(local_model_path))
         _model = joblib.load(local_model_path)
@@ -147,60 +162,7 @@ def load_model() -> Optional[object]:
         return None
 
 
-# -------------------- Prediction logic (to customize) -------------------- #
-
-# def predict_for_games(schedule_df: pd.DataFrame) -> pd.DataFrame:
-#     """
-#     给未来赛程加上预测结果。
-
-#     输入：schedule_df，必须至少包含列：
-#       - GAME_ID
-#       - GAME_DATE
-#       - HOME_TEAM_ABBR / HOME_TEAM_ID  （具体根据你自己的 schedule CSV 来）
-#       - AWAY_TEAM_ABBR / AWAY_TEAM_ID
-
-#     输出：在 DataFrame 上增加：
-#       - home_win_prob
-#       - away_win_prob
-#       - predicted_point_diff
-
-#     现在先给一个“安全的默认实现”：如果模型加载失败，就输出 0.5 概率 + 0 分差；
-#     你可以在这里接入你真正的特征构造 + model.predict_proba。
-#     """
-#     model = load_model()
-
-#     # 先保证必要的列存在（列名请根据你自己的 CSV 调整）
-#     # 这里假设列名为：HOME_TEAM_ABBREVIATION / VISITOR_TEAM_ABBREVIATION / HOME_TEAM_ID / VISITOR_TEAM_ID
-#     expected_cols = ["GAME_ID", "GAME_DATE", "HOME_TEAM_ABBREVIATION", "VISITOR_TEAM_ABBREVIATION"]
-#     missing = [c for c in expected_cols if c not in schedule_df.columns]
-#     if missing:
-#         raise ValueError(f"[api_server] schedule CSV is missing columns: {missing}")
-
-#     # 如果你已经有一套 “从 team_game_features 构造未来比赛特征” 的函数，
-#     # 可以在这里调用，比如：
-#     #
-#     #   feature_df = build_features_for_schedule(schedule_df)
-#     #   proba = model.predict_proba(feature_df[FEATURE_COLUMNS])
-#     #
-#     # 这里先用 dummy 的方式给个结构，保证 API 能正常返回。
-#     n = len(schedule_df)
-#     if model is None:
-#         # 没有模型 → 全部 50% / 50%，分差 0
-#         schedule_df["home_win_prob"] = 0.5
-#         schedule_df["away_win_prob"] = 0.5
-#         schedule_df["predicted_point_diff"] = 0.0
-#         return schedule_df
-
-#     # TODO: 在这里接入真实特征构造
-#     # 目前先用一个简单的随机示例（你部署前务必换成真实逻辑）
-#     rng = np.random.default_rng(seed=42)
-#     home_win = rng.uniform(0.35, 0.65, size=n)  # 稍微偏中间一点
-#     schedule_df["home_win_prob"] = home_win
-#     schedule_df["away_win_prob"] = 1.0 - home_win
-#     schedule_df["predicted_point_diff"] = (home_win - 0.5) * 20.0  # 粗暴映射成分差
-
-#     return schedule_df
-
+# -------------------- Prediction logic (fake for now) -------------------- #
 
 def predict_for_games(schedule_df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -265,6 +227,33 @@ def predict_for_games(schedule_df: pd.DataFrame) -> pd.DataFrame:
     return schedule_df
 
 
+def fake_predict_single_game(game_date: str, home_team: str, away_team: str):
+    """
+    给单场比赛生成“假的但稳定的”预测。
+
+    返回:
+      home_win_prob, away_win_prob, predicted_point_diff
+    """
+    # 标准化一下输入
+    game_date = pd.to_datetime(game_date).strftime("%Y-%m-%d")
+    home_team = str(home_team).upper().strip()
+    away_team = str(away_team).upper().strip()
+
+    game_key = f"{game_date}_{home_team}_vs_{away_team}"
+
+    # 用 hash 让同一场比赛多次调用结果一致
+    game_hash = hash(game_key)
+    game_hash_float = (game_hash % 10_000) / 10_000.0  # 映射到 [0,1)
+
+    raw_prob = 0.5 + (game_hash_float - 0.5) * 0.5
+    home_prob = float(np.clip(raw_prob, 0.4, 0.7))
+    away_prob = 1.0 - home_prob
+
+    point_diff = float((home_prob - 0.5) * 30.0)   # -15 ~ +15
+
+    return home_prob, away_prob, point_diff
+
+
 # -------------------- Endpoint helpers -------------------- #
 
 def _load_yesterday_games_df() -> pd.DataFrame:
@@ -273,10 +262,6 @@ def _load_yesterday_games_df() -> pd.DataFrame:
     path = LOCAL_DATA_DIR / fname
     print(f"[api_server] Loading yesterday games: {path}")
     df = _read_csv_if_exists(path)
-
-    # 这里假设你的 CSV 至少有这些列（根据你的 daily_crawl_and_upload 代码）：
-    # GAME_ID, GAME_DATE, HOME_TEAM_ABBREVIATION, VISITOR_TEAM_ABBREVIATION,
-    # HOME_TEAM_ID, VISITOR_TEAM_ID, PTS_HOME, PTS_AWAY
     return df
 
 
@@ -411,5 +396,35 @@ def get_upcoming_with_predictions(days: int = 5):
             )
         )
     return preds
+
+
+@app.post("/predict", response_model=PredictionResponse)
+def predict_game(req: PredictionRequest):
+    """
+    给定 game_date + home_team + away_team，返回一场比赛的预测结果。
+
+    示例请求 JSON:
+    {
+      "game_date": "2025-11-24",
+      "home_team": "LAL",
+      "away_team": "BOS"
+    }
+    """
+    try:
+        home_prob, away_prob, diff = fake_predict_single_game(
+            req.game_date, req.home_team, req.away_team
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return PredictionResponse(
+        game_date=pd.to_datetime(req.game_date).strftime("%Y-%m-%d"),
+        home_team=req.home_team.upper(),
+        away_team=req.away_team.upper(),
+        home_win_prob=home_prob,
+        away_win_prob=away_prob,
+        predicted_point_diff=diff,
+    )
+
 
 

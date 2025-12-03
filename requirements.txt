@@ -1,11 +1,9 @@
+boto3
 pandas
 numpy
+nba_api
 scikit-learn
 joblib
 requests
-nba_api
-boto3
-botocore
 python-dateutil
-pytz
 

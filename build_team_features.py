@@ -246,7 +246,7 @@ def add_rolling_and_season_features(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------- S3 Helpers ---------------- #
 
 def _download_raw_from_s3() -> List[Path]:
-    """Download all cleaned player CSVs from S3 raw/ and return paths."""
+    """Download all *player-level* CSVs from S3 raw/ and return paths."""
     LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
     raw_dir = LOCAL_DATA_DIR / "raw_from_s3"
     raw_dir.mkdir(parents=True, exist_ok=True)
@@ -266,6 +266,15 @@ def _download_raw_from_s3() -> List[Path]:
             continue
 
         filename = key.split("/")[-1]
+
+        # ✅ 只保留球员级日志：player_logs_ 开头
+        #   - player_logs_clean_all_...
+        #   - player_logs_clean_season_...
+        #   - player_logs_daily_...
+        if not filename.startswith("player_logs_"):
+            print(f"[build_team_features] Skip non-player file: {filename}")
+            continue
+
         local_path = raw_dir / filename
 
         if not local_path.exists():
@@ -277,10 +286,11 @@ def _download_raw_from_s3() -> List[Path]:
         csv_paths.append(local_path)
 
     if not csv_paths:
-        raise RuntimeError("[build_team_features] No CSVs in S3 raw/")
+        raise RuntimeError("[build_team_features] No player_logs_*.csv in S3 raw/")
 
     print(f"[build_team_features] Ready {len(csv_paths)} CSVs")
     return csv_paths
+
 
 
 def _upload_team_features_to_s3(local_path: Path) -> None:

@@ -246,7 +246,10 @@ def add_rolling_and_season_features(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------- S3 Helpers ---------------- #
 
 def _download_raw_from_s3() -> List[Path]:
-    """Download all *player-level* CSVs from S3 raw/ and return paths."""
+    """
+    Download ONLY player_logs_all.csv from S3.
+    This avoids double-counting caused by season + all + daily files.
+    """
     LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
     raw_dir = LOCAL_DATA_DIR / "raw_from_s3"
     raw_dir.mkdir(parents=True, exist_ok=True)
@@ -258,38 +261,29 @@ def _download_raw_from_s3() -> List[Path]:
     resp = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix)
 
     contents = resp.get("Contents", [])
-    csv_paths: List[Path] = []
+    master_key = None
 
+    # find master table
     for obj in contents:
-        key = obj["Key"]
-        if not key.endswith(".csv"):
-            continue
+        fname = obj["Key"].split("/")[-1]
+        if fname == "player_logs_all.csv":
+            master_key = obj["Key"]
+            break
 
-        filename = key.split("/")[-1]
+    if master_key is None:
+        raise RuntimeError("[build_team_features] ERROR: player_logs_all.csv not found in S3 raw/. Training cannot continue.")
 
-        # ✅ 只保留球员级日志：player_logs_ 开头
-        #   - player_logs_clean_all_...
-        #   - player_logs_clean_season_...
-        #   - player_logs_daily_...
-        if not filename.startswith("player_logs_"):
-            print(f"[build_team_features] Skip non-player file: {filename}")
-            continue
+    # download master
+    local_path = raw_dir / "player_logs_all.csv"
+    if not local_path.exists():
+        print(f"[build_team_features] Downloading master: {master_key}")
+        s3.download_file(S3_BUCKET, master_key, str(local_path))
+    else:
+        print(f"[build_team_features] Using cached master: {local_path}")
 
-        local_path = raw_dir / filename
+    print("[build_team_features] Using ONLY player_logs_all.csv as data source.")
+    return [local_path]
 
-        if not local_path.exists():
-            print(f"[build_team_features] Downloading {key}")
-            s3.download_file(S3_BUCKET, key, str(local_path))
-        else:
-            print(f"[build_team_features] Using local: {local_path}")
-
-        csv_paths.append(local_path)
-
-    if not csv_paths:
-        raise RuntimeError("[build_team_features] No player_logs_*.csv in S3 raw/")
-
-    print(f"[build_team_features] Ready {len(csv_paths)} CSVs")
-    return csv_paths
 
 
 

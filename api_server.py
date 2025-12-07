@@ -224,12 +224,13 @@ def _load_upcoming_schedule_df(days: int = 5) -> pd.DataFrame:
     return schedule_df
 
 
-def _load_latest_team_features() -> Optional[pd.DataFrame]:
+def _load_latest_team_features(n_last_games: int = 5) -> Optional[pd.DataFrame]:
     """
-    从 team_game_features.csv 中读取每支球队最近一场比赛的 rolling 特征。
-    自动适配列名：
-      - TEAM_ABBREVIATION / TEAM / TEAM_NAME
-      - GAME_DATE / Date
+    返回每支球队最近 n_last_games 场比赛的平均特征（用于未来预测）。
+
+    自动识别列名：
+      - 球队列：TEAM_ABBREVIATION / TEAM / TEAM_NAME
+      - 日期列：GAME_DATE
     """
     feature_file = LOCAL_DATA_DIR / "team_game_features.csv"
     if not feature_file.exists():
@@ -238,35 +239,43 @@ def _load_latest_team_features() -> Optional[pd.DataFrame]:
 
     df = pd.read_csv(feature_file)
 
-    # ---- 自动寻找球队列 ----
+    # 自动查找球队列
     team_col_candidates = ["TEAM_ABBREVIATION", "TEAM", "TEAM_NAME"]
     team_col = next((c for c in team_col_candidates if c in df.columns), None)
     if team_col is None:
-        print(f"[api_server] ERROR: No team column found. Available: {df.columns.tolist()}")
+        print("[api_server] ERROR: No team column found.")
         return None
 
-    # ---- 自动寻找日期列 ----
-    date_col_candidates = ["GAME_DATE", "date", "Date"]
-    date_col = next((c for c in date_col_candidates if c in df.columns), None)
+    # 自动查找日期列
+    date_col = "GAME_DATE" if "GAME_DATE" in df.columns else None
     if date_col is None:
-        print("[api_server] ERROR: No GAME_DATE column found.")
+        print("[api_server] ERROR: GAME_DATE column missing.")
         return None
 
-    # 标准化列名
+    # 标准化一下列名
     df = df.rename(columns={team_col: "TEAM", date_col: "GAME_DATE"})
     df["GAME_DATE"] = pd.to_datetime(df["GAME_DATE"])
 
-    # ---- 对每支球队取最近一场比赛 ----
-    df_sorted = df.sort_values(["TEAM", "GAME_DATE"])
-    latest_df = df_sorted.groupby("TEAM").tail(1).reset_index(drop=True)
-
-    # ---- 检查特征列是否齐全 ----
-    missing = [c for c in FEATURE_COLUMNS if c not in latest_df.columns]
+    # 确保所有特征都存在
+    missing = [c for c in FEATURE_COLUMNS if c not in df.columns]
     if missing:
         print(f"[api_server] ERROR: Missing feature columns: {missing}")
         return None
 
-    return latest_df
+    # 按 TEAM + GAME_DATE 排序
+    df = df.sort_values(["TEAM", "GAME_DATE"])
+
+    # ---- 对每支球队取最近 n_last_games 场比赛，然后算均值 ----
+    latest_features = (
+        df.groupby("TEAM")
+          .tail(n_last_games)
+          .groupby("TEAM")[FEATURE_COLUMNS]
+          .mean()
+          .reset_index()
+    )
+
+    return latest_features
+
 
 
 

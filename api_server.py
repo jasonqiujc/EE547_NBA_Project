@@ -226,34 +226,48 @@ def _load_upcoming_schedule_df(days: int = 5) -> pd.DataFrame:
 
 def _load_latest_team_features() -> Optional[pd.DataFrame]:
     """
-    从 team_game_features.csv 中读取每支球队的“最新一场比赛”的特征行。
-
-    注意：这是一个简化版逻辑，用于给未来比赛构造输入特征：
-      - 对于每支球队，取按 GAME_DATE 排序后的最后一行
-      - 假设这行的 FEATURE_COLUMNS 能代表球队当前状态
+    从 team_game_features.csv 中读取每支球队最近一场比赛的 rolling 特征。
+    自动适配列名：
+      - TEAM_ABBREVIATION / TEAM / TEAM_NAME
+      - GAME_DATE / Date
     """
     feature_file = LOCAL_DATA_DIR / "team_game_features.csv"
     if not feature_file.exists():
-        print(f"[api_server] WARNING: team_game_features.csv not found at {feature_file}")
+        print("[api_server] WARNING: team_game_features.csv not found.")
         return None
 
     df = pd.read_csv(feature_file)
-    if "TEAM" not in df.columns or "GAME_DATE" not in df.columns:
-        print("[api_server] WARNING: team_game_features.csv missing TEAM or GAME_DATE.")
+
+    # ---- 自动寻找球队列 ----
+    team_col_candidates = ["TEAM_ABBREVIATION", "TEAM", "TEAM_NAME"]
+    team_col = next((c for c in team_col_candidates if c in df.columns), None)
+    if team_col is None:
+        print(f"[api_server] ERROR: No team column found. Available: {df.columns.tolist()}")
         return None
 
+    # ---- 自动寻找日期列 ----
+    date_col_candidates = ["GAME_DATE", "date", "Date"]
+    date_col = next((c for c in date_col_candidates if c in df.columns), None)
+    if date_col is None:
+        print("[api_server] ERROR: No GAME_DATE column found.")
+        return None
+
+    # 标准化列名
+    df = df.rename(columns={team_col: "TEAM", date_col: "GAME_DATE"})
     df["GAME_DATE"] = pd.to_datetime(df["GAME_DATE"])
 
-    # 对每支球队取最近一场的特征
+    # ---- 对每支球队取最近一场比赛 ----
     df_sorted = df.sort_values(["TEAM", "GAME_DATE"])
     latest_df = df_sorted.groupby("TEAM").tail(1).reset_index(drop=True)
 
+    # ---- 检查特征列是否齐全 ----
     missing = [c for c in FEATURE_COLUMNS if c not in latest_df.columns]
     if missing:
-        print(f"[api_server] WARNING: team_game_features.csv missing feature columns: {missing}")
+        print(f"[api_server] ERROR: Missing feature columns: {missing}")
         return None
 
     return latest_df
+
 
 
 def _predict_scores_for_schedule(schedule_df: pd.DataFrame) -> Optional[pd.DataFrame]:

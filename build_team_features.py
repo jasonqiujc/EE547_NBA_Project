@@ -164,6 +164,7 @@ def attach_opponent(team_game: pd.DataFrame) -> pd.DataFrame:
         suffixes=("", "_OPP"),
     )
 
+    # 自连接后会有两行自己 vs 自己，我们只保留“对手那一行”
     merged = merged[merged["TEAM_ID"] != merged["TEAM_ID_OPP"]].copy()
 
     merged = merged.rename(
@@ -178,4 +179,172 @@ def attach_opponent(team_game: pd.DataFrame) -> pd.DataFrame:
     merged["PTS_AGAINST"] = merged["PTS_FOR_OPP"]
     merged["point_diff"] = merged["PTS_FOR"] - merged["PTS_AGAINST"]
 
-    drop_cols =_
+    drop_cols = [c for c in merged.columns if c.endswith("_OPP") and c not in (
+        "OPP_TEAM_ID", "OPP_TEAM_ABBREVIATION", "OPP_WIN", "PTS_FOR_OPP"
+    )]
+    merged = merged.drop(columns=drop_cols)
+
+    print(f"[build_team_features] Rows after opponent merge: {len(merged)}")
+    return merged
+
+
+# ---------------- Schedule Features ---------------- #
+
+def add_schedule_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute rest_days and back-to-back indicator."""
+    print("[build_team_features] Computing rest-day features ...")
+    df = df.sort_values(["TEAM_ID", "GAME_DATE"]).copy()
+
+    df["GAME_DATE"] = pd.to_datetime(df["GAME_DATE"])
+    grp = df.groupby(["SEASON", "TEAM_ID"], group_keys=False)
+
+    prev_date = grp["GAME_DATE"].shift(1)
+    df["rest_days"] = (df["GAME_DATE"] - prev_date).dt.days
+    df["is_back_to_back"] = (df["rest_days"] == 1).astype(int)
+
+    return df
+
+
+# ---------------- Rolling & Season Features ---------------- #
+
+def add_rolling_and_season_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Add rolling features (5/10 games) and season-to-date win rate."""
+    print("[build_team_features] Computing rolling & season features ...")
+    df = df.sort_values(["TEAM_ID", "GAME_DATE"]).copy()
+
+    df["PTS_FOR"] = df["PTS_FOR"].astype(float)
+    df["PTS_AGAINST"] = df["PTS_AGAINST"].astype(float)
+    df["point_diff"] = df["point_diff"].astype(float)
+    df["WIN"] = df["WIN"].astype(int)
+
+    grp_team = df.groupby("TEAM_ID", group_keys=False)
+
+    # Rolling averages
+    for col in ["PTS_FOR", "PTS_AGAINST", "point_diff"]:
+        df[f"roll5_{col}"] = grp_team[col].apply(lambda s: s.rolling(5, 1).mean()).shift(1)
+
+    for col in ["PTS_FOR", "point_diff"]:
+        df[f"roll10_{col}"] = grp_team[col].apply(lambda s: s.rolling(10, 1).mean()).shift(1)
+
+    df["roll10_win_rate"] = grp_team["WIN"].apply(lambda s: s.rolling(10, 1).mean()).shift(1)
+
+    # Season cumulative win rate (no leakage)
+    grp_season_team = df.groupby(["SEASON", "TEAM_ID"], group_keys=False)
+    df["season_games_played"] = grp_season_team.cumcount()
+    cumsum_wins = grp_season_team["WIN"].cumsum()
+    df["season_wins_so_far"] = cumsum_wins - df["WIN"]
+
+    df["season_win_rate"] = np.where(
+        df["season_games_played"] > 0,
+        df["season_wins_so_far"] / df["season_games_played"],
+        np.nan,
+    )
+
+    return df
+
+
+# ---------------- S3 Helpers ---------------- #
+
+def _download_raw_from_s3() -> List[Path]:
+    """Download all cleaned player CSVs from S3 raw/ and return paths."""
+    LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    raw_dir = LOCAL_DATA_DIR / "raw_from_s3"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+
+    s3 = boto3.client("s3", region_name=AWS_REGION)
+    prefix = f"{S3_PREFIX}raw/"
+
+    print(f"[build_team_features] Listing S3: s3://{S3_BUCKET}/{prefix}")
+    resp = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix)
+
+    contents = resp.get("Contents", [])
+    csv_paths: List[Path] = []
+
+    for obj in contents:
+        key = obj["Key"]
+        if not key.endswith(".csv"):
+            continue
+
+        filename = key.split("/")[-1]
+        local_path = raw_dir / filename
+
+        if not local_path.exists():
+            print(f"[build_team_features] Downloading {key}")
+            s3.download_file(S3_BUCKET, key, str(local_path))
+        else:
+            print(f"[build_team_features] Using local: {local_path}")
+
+        csv_paths.append(local_path)
+
+    if not csv_paths:
+        raise RuntimeError("[build_team_features] No CSVs in S3 raw/")
+
+    print(f"[build_team_features] Ready {len(csv_paths)} CSVs")
+    return csv_paths
+
+
+def _upload_team_features_to_s3(local_path: Path) -> None:
+    """
+    Upload the generated team_game_features.csv to S3.
+
+    上传路径：
+        s3://{S3_BUCKET}/{S3_PREFIX}raw/team_game_features.csv
+    """
+    s3 = boto3.client("s3", region_name=AWS_REGION)
+    key = f"{S3_PREFIX}raw/team_game_features.csv"
+    print(f"[build_team_features] Uploading team features to s3://{S3_BUCKET}/{key}")
+    s3.upload_file(str(local_path), S3_BUCKET, key)
+    print("[build_team_features] Upload done.")
+
+
+# ---------------- Public API ---------------- #
+
+def build_team_features(
+    input_paths: Optional[List[str]] = None,
+    output_path: Optional[str] = None,
+) -> List[Path]:
+    """Main function to build team-level features."""
+    if input_paths is None:
+        csv_paths = _download_raw_from_s3()
+    else:
+        csv_paths = [Path(p) for p in input_paths]
+
+    df_players = load_player_logs(csv_paths)
+    team_game = aggregate_to_team_games(df_players)
+    team_with_opp = attach_opponent(team_game)
+    team_with_sched = add_schedule_features(team_with_opp)
+    team_features = add_rolling_and_season_features(team_with_sched)
+
+    out_path = LOCAL_DATA_DIR / "team_game_features.csv" if output_path is None else Path(output_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    team_features.to_csv(out_path, index=False)
+
+    print("\n✅ [build_team_features] Saved to:", out_path)
+    print(f"Rows: {len(team_features)}; Cols: {len(team_features.columns)}")
+
+    # 上传到 S3
+    try:
+        _upload_team_features_to_s3(out_path)
+    except Exception as e:
+        print(f"[build_team_features] WARNING: Failed to upload team features to S3: {e}")
+
+    return [out_path]
+
+
+# ---------------- CLI ---------------- #
+
+def parse_args():
+    p = argparse.ArgumentParser(description="Build team-level features.")
+    p.add_argument("--input", "-i", nargs="+", required=True, help="Input cleaned player CSVs.")
+    p.add_argument("--output", "-o", required=True, help="Output CSV path.")
+    return p.parse_args()
+
+
+def main():
+    args = parse_args()
+    build_team_features(input_paths=args.input, output_path=args.output)
+
+
+if __name__ == "__main__":
+    main()
+

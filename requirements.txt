@@ -6,4 +6,4 @@ scikit-learn
 joblib
 requests
 python-dateutil
-
+torch==2.2.0 --index-url https://download.pytorch.org/whl/cpu

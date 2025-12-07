@@ -44,7 +44,8 @@ FEATURE_COLUMNS = [
     "season_win_rate",
 ]
 
-SCORE_COLUMNS = ["HOME_SCORE", "AWAY_SCORE"]  # 你 CSV 中存最终比分的两列名
+SCORE_COLUMNS = ["PTS_FOR", "PTS_AGAINST"]
+  # 你 CSV 中存最终比分的两列名
 
 MODEL_DIR = LOCAL_DATA_DIR / "models"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)

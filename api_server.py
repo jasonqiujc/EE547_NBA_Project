@@ -17,7 +17,7 @@ FastAPI server for NBA dashboard.
 
 预测部分：
   - 目前是“假预测”（根据 hash + 随机数生成稳定的概率和分差），
-    未来你可以在 fake_predict_single_game / predict_for_games 里接入真实模型。
+    已经接入 PyTorch 模型的加载逻辑，但 /upcoming 和 /predict 仍使用假预测。
 """
 
 from __future__ import annotations
@@ -28,13 +28,16 @@ from typing import List, Optional
 
 import numpy as np
 import pandas as pd
-import joblib
+import torch
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from config_aws import LOCAL_DATA_DIR, AWS_REGION, S3_BUCKET, S3_PREFIX
 import boto3
+
+# 从新的 train_model.py 中导入模型结构 & 特征列 & 模型目录
+from train_model import MLPRegressor, FEATURE_COLUMNS, MODEL_DIR
 
 
 # -------------------- FastAPI app -------------------- #
@@ -115,54 +118,69 @@ def _read_csv_if_exists(path: Path) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
-# -------------------- Helpers: model loading -------------------- #
+# -------------------- Helpers: PyTorch model loading -------------------- #
 
-_model = None
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+_model: Optional[MLPRegressor] = None
 _model_loaded_from: Optional[str] = None
 
 
-def load_model() -> Optional[object]:
+def load_model() -> Optional[MLPRegressor]:
     """
-    加载训练好的模型（懒加载，全局缓存一次）。
+    加载 PyTorch 模型（懒加载，全局缓存一次）。
 
     约定：
-      1）优先从本地 LOCAL_DATA_DIR / "model_latest.pkl" 读取；
-      2）如果本地没有，尝试从 S3: {S3_PREFIX}models/model_latest.pkl 下载再加载；
-      3）如果都失败，返回 None（API 会用 Dummy 预测而不是报 500）。
+      1）优先从本地 MODEL_DIR / "model_latest.pth" 读取；
+      2）如果本地没有，尝试从 S3: {S3_PREFIX}models/model_latest.pth 下载再加载；
+      3）如果都失败，返回 None（API 会继续使用假预测逻辑）。
     """
     global _model, _model_loaded_from
 
     if _model is not None:
         return _model
 
-    local_model_path = LOCAL_DATA_DIR / "model_latest.pkl"
+    local_model_path = MODEL_DIR / "model_latest.pth"
 
     # 1) 尝试本地
     if local_model_path.exists():
-        _model = joblib.load(local_model_path)
-        _model_loaded_from = "local"
-        print(f"[api_server] Loaded model from local: {local_model_path}")
-        return _model
+        try:
+            model = MLPRegressor(input_dim=len(FEATURE_COLUMNS)).to(device)
+            state = torch.load(local_model_path, map_location=device)
+            model.load_state_dict(state)
+            model.eval()
+            _model = model
+            _model_loaded_from = "local"
+            print(f"[api_server] Loaded PyTorch model from local: {local_model_path}")
+            return _model
+        except Exception as e:
+            print(f"[api_server] ERROR loading local model: {e}")
 
-    # 2) 尝试从 S3 下载
+    # 2) 本地没有或加载失败，就从 S3 下载
     try:
-        LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        MODEL_DIR.mkdir(parents=True, exist_ok=True)
         s3_client = boto3.client("s3", region_name=AWS_REGION)
-        key = f"{S3_PREFIX}models/model_latest.pkl"
-        print(f"[api_server] Downloading model from S3: s3://{S3_BUCKET}/{key}")
+        key = f"{S3_PREFIX}models/model_latest.pth"
+        print(f"[api_server] Downloading PyTorch model from S3: s3://{S3_BUCKET}/{key}")
         s3_client.download_file(S3_BUCKET, key, str(local_model_path))
-        _model = joblib.load(local_model_path)
+
+        model = MLPRegressor(input_dim=len(FEATURE_COLUMNS)).to(device)
+        state = torch.load(local_model_path, map_location=device)
+        model.load_state_dict(state)
+        model.eval()
+
+        _model = model
         _model_loaded_from = "s3"
-        print("[api_server] Model downloaded and loaded successfully.")
+        print("[api_server] PyTorch model downloaded and loaded successfully.")
         return _model
     except Exception as e:
-        print(f"[api_server] WARNING: Failed to load model: {e}")
+        print(f"[api_server] WARNING: Failed to load PyTorch model: {e}")
         _model = None
         _model_loaded_from = None
         return None
 
 
-# -------------------- Prediction logic (fake for now) -------------------- #
+# -------------------- Prediction logic (目前仍为 fake) -------------------- #
 
 def predict_for_games(schedule_df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -293,6 +311,12 @@ def _load_upcoming_schedule_df(days: int = 5) -> pd.DataFrame:
 # -------------------- API endpoints -------------------- #
 
 
+@app.on_event("startup")
+def _startup():
+    """启动时尝试加载一次模型（失败也不影响 API 启动）。"""
+    load_model()
+
+
 @app.get("/health")
 def health():
     """健康检查：前端或监控可以用这个看 API 是否存活。"""
@@ -300,6 +324,8 @@ def health():
     return {
         "status": "ok",
         "model_loaded_from": _model_loaded_from,
+        "model_available": model is not None,
+        "device": device,
     }
 
 
@@ -353,6 +379,8 @@ def get_upcoming_with_predictions(days: int = 5):
     """
     返回今天开始未来 N 天的赛程 + 预测。
     赛程 CSV 只需要包含：GAME_DATE / HOME_TEAM / AWAY_TEAM
+
+    目前仍使用 fake 预测逻辑。
     """
     try:
         schedule_df = _load_upcoming_schedule_df(days=days)
@@ -403,12 +431,8 @@ def predict_game(req: PredictionRequest):
     """
     给定 game_date + home_team + away_team，返回一场比赛的预测结果。
 
-    示例请求 JSON:
-    {
-      "game_date": "2025-11-24",
-      "home_team": "LAL",
-      "away_team": "BOS"
-    }
+    目前仍使用 fake_predict_single_game，用于前端调试。
+    未来可以改成真实模型 + 特征工程。
     """
     try:
         home_prob, away_prob, diff = fake_predict_single_game(
@@ -425,6 +449,5 @@ def predict_game(req: PredictionRequest):
         away_win_prob=away_prob,
         predicted_point_diff=diff,
     )
-
 
 

@@ -1,0 +1,512 @@
+=== Running crawler at Wed Dec  3 00:55:00 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 01:49:27 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 01:50:00 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 03:35:00 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 07:25:00 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 07:49:08 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 08:40:00 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 08:50:33 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 08:55:00 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 09:50:41 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 11:25:00 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 12:53:19 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 12:55:14 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 13:39:10 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 13:40:00 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).
+=== Running crawler at Wed Dec  3 13:45:00 PST 2025 ===
+Using Python: /Users/jasonqiu/EE547_NBA_Project/venv/bin/python
+PWD: /Users/jasonqiu/EE547_NBA_Project
+[time] ET today=2025-12-03, yesterday=2025-12-02
+[player logs] season=2025-26, date=12/02/2025 (ET) ...
+[player logs] Raw rows: 127
+[player logs] Saving to /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/player_logs_daily_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/player_logs_daily_20251202.csv
+[games-from-players] built 6 games
+[games] Saving yesterday games to /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/games_yesterday_20251202.csv -> s3://ee547-nba-project/datasets/nba_project/raw/games_yesterday_20251202.csv
+[schedule] Fetching schedule for 12/03/2025 (ET) ...
+[schedule] GameHeader rows=9
+[schedule] Saving schedule for 2025-12-03 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251203.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251203.csv
+[schedule] Fetching schedule for 12/04/2025 (ET) ...
+[schedule] GameHeader rows=5
+[schedule] Saving schedule for 2025-12-04 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251204.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251204.csv
+[schedule] Fetching schedule for 12/05/2025 (ET) ...
+[schedule] GameHeader rows=12
+[schedule] Saving schedule for 2025-12-05 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251205.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251205.csv
+[schedule] Fetching schedule for 12/06/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-06 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251206.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251206.csv
+[schedule] Fetching schedule for 12/07/2025 (ET) ...
+[schedule] GameHeader rows=7
+[schedule] Saving schedule for 2025-12-07 to /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv
+[upload] /Users/jasonqiu/EE547_NBA_Project/data/schedule_20251207.csv -> s3://ee547-nba-project/datasets/nba_project/raw/schedule_20251207.csv
+Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).

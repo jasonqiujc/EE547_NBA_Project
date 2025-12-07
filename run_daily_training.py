@@ -25,8 +25,8 @@ import pandas as pd
 
 from config_aws import S3_BUCKET, S3_PREFIX, AWS_REGION
 from build_team_features import build_team_features
-from train_model import train_model
-from train_score_model import train_score_model
+from build_team_features import build_team_features
+from train_model import train_model 
 
 
 # ===============================================================
@@ -99,32 +99,24 @@ def _normalize_feature_paths(feature_paths) -> List[Union[str, Path]]:
         return [feature_paths]
     return list(feature_paths)
 
-
 def main():
-
-    # ----------- 新增：先更新主表 -----------
+    # 先更新主表（不动）
     master_local_path = update_master_player_logs()
 
     print("\n========== [run_daily_training] Step 1: Build team features ==========")
     feature_paths = build_team_features()
     feature_paths = _normalize_feature_paths(feature_paths)
-
     print("[run_daily_training] Feature files:", feature_paths)
 
-    # --------- Step 2: 胜率模型 ----------
-    print("\n========== [run_daily_training] Step 2: Train win model ==========")
-    win_model_s3_key = train_model(feature_paths)
-
-    # --------- Step 3: 比分模型 ----------
-    print("\n========== [run_daily_training] Step 3: Train score model ==========")
-    score_model_s3_key = train_score_model(feature_paths)
+    # --------- Step 2: 训练 PyTorch 比分模型 ----------
+    print("\n========== [run_daily_training] Step 2: Train score model (PyTorch) ==========")
+    score_model_s3_key = train_model(feature_paths)   # train_model 返回 .pth 的 key
 
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     print(f"\n[{now}] Training complete.")
-    print(f"New win model uploaded to:   s3://{S3_BUCKET}/{win_model_s3_key}")
     print(f"New score model uploaded to: s3://{S3_BUCKET}/{score_model_s3_key}")
-    print(f"Latest win model at:         s3://{S3_BUCKET}/{S3_PREFIX}models/model_latest.pkl")
-    print(f"Latest score model at:       s3://{S3_BUCKET}/{S3_PREFIX}models/score_model_latest.pkl")
+    print(f"Latest score model at:       s3://{S3_BUCKET}/{S3_PREFIX}models/model_latest.pth")
+
 
 
 if __name__ == "__main__":

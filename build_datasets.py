@@ -4,7 +4,7 @@
 """
 Fetch and CLEAN player game logs for:
   - The last THREE full NBA seasons
-  - The CURRENT season up to a cutoff date (默认 = 昨天)
+  - The CURRENT season up to a cutoff date (default = yesterday)
 
 Produces:
   - One cleaned CSV per full season
@@ -32,10 +32,10 @@ INCLUDE_PLAYOFFS = True
 SLEEP_BETWEEN_CALLS = 1.5
 TIMEOUT = 30
 
-# 只作为文件名前缀，不带目录
+# Used only as filename prefix (no directory)
 OUTPUT_PREFIX = "player_logs_clean"
 
-# 截止到“昨天”的数据
+# Data up through “yesterday”
 CUTOFF_DATE = date.today() - timedelta(days=1)
 
 # Only keep columns needed for modeling
@@ -69,9 +69,7 @@ KEEP_COLS = [
     "PLUS_MINUS",
 ]
 
-
 # ---------------- Season helpers -------------------
-
 
 def current_nba_season_start_year(today: date) -> int:
     """
@@ -100,9 +98,7 @@ def last_n_full_seasons(n: int, today: date) -> List[str]:
         seasons.append(format_season(cur_start - i))
     return seasons
 
-
 # ---------------- Fetch helpers -------------------
-
 
 def fetch_logs_for_season(
     season: str,
@@ -142,15 +138,15 @@ def clean_logs(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
 
-    # 只保留需要的原始列
+    # Keep only required raw columns
     cols = [c for c in KEEP_COLS if c in df.columns]
     clean = df[cols].copy()
 
-    # 规范日期类型
+    # Normalize date type
     if "GAME_DATE" in clean.columns:
         clean["GAME_DATE"] = pd.to_datetime(clean["GAME_DATE"])
 
-    # 从 SEASON_ID 生成更好看的 SEASON（如 '2022-23'）
+    # Generate cleaner SEASON column from SEASON_ID (e.g., '2022-23')
     if "SEASON_ID" in clean.columns:
         start_year = clean["SEASON_ID"].astype(str).str[:4].astype(int)
         clean["SEASON"] = (
@@ -159,7 +155,7 @@ def clean_logs(df: pd.DataFrame) -> pd.DataFrame:
             + (start_year + 1).astype(str).str[-2:]
         )
 
-    # 计算命中率列 FG_PCT / FG3_PCT / FT_PCT
+    # Compute shooting percentage columns FG_PCT / FG3_PCT / FT_PCT
     if "FGM" in clean.columns and "FGA" in clean.columns:
         clean["FG_PCT"] = clean["FGM"] / clean["FGA"].replace({0: np.nan})
     if "FG3M" in clean.columns and "FG3A" in clean.columns:
@@ -169,9 +165,7 @@ def clean_logs(df: pd.DataFrame) -> pd.DataFrame:
 
     return clean
 
-
 # ---------------- Public API: build_datasets -------------------
-
 
 def build_datasets() -> List[Path]:
     """
@@ -181,7 +175,7 @@ def build_datasets() -> List[Path]:
     """
     LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    today = CUTOFF_DATE  # 默认为“昨天”
+    today = CUTOFF_DATE  # default = yesterday
     full_seasons = last_n_full_seasons(3, today)
     current_season = format_season(current_nba_season_start_year(today))
 
@@ -191,7 +185,7 @@ def build_datasets() -> List[Path]:
     all_frames: List[pd.DataFrame] = []
     output_paths: List[Path] = []
 
-    # --- Full seasons (完整三季) ---
+    # --- Full seasons (last 3 complete seasons) ---
     for s in full_seasons:
         raw = fetch_logs_for_season(s)
         if raw.empty:
@@ -206,14 +200,14 @@ def build_datasets() -> List[Path]:
         all_frames.append(clean)
         output_paths.append(out_path)
 
-    # --- Current season partial (本赛季截至 cutoff=昨天) ---
-    # 简单稳妥：抓整季，然后在本地用 GAME_DATE 截断
+    # --- Current season partial (up to cutoff = yesterday) ---
+    # Easiest reliable method: fetch entire season, then filter by GAME_DATE locally
     cur_raw = fetch_logs_for_season(current_season)
 
     if not cur_raw.empty:
         cur_clean = clean_logs(cur_raw)
 
-        # 只保留 GAME_DATE <= cutoff（也就是昨天）
+        # Keep rows with GAME_DATE <= cutoff (yesterday)
         if "GAME_DATE" in cur_clean.columns:
             cur_clean = cur_clean[cur_clean["GAME_DATE"].dt.date <= today]
 
@@ -250,3 +244,4 @@ if __name__ == "__main__":
     print("\nGenerated files:")
     for p in paths:
         print(" -", p)
+

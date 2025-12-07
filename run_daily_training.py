@@ -49,6 +49,12 @@ def update_master_player_logs():
     master_key = f"{S3_PREFIX}raw/player_logs_all.csv"
     daily_key = f"{S3_PREFIX}raw/{daily_fname}"
 
+    tmp_dir = Path("/tmp")
+    tmp_dir.mkdir(exist_ok=True)
+
+    master_local = tmp_dir / "player_logs_all.csv"
+    daily_local = tmp_dir / daily_fname
+
     # ----------- 下载历史主表 -----------
     try:
         s3.download_file(S3_BUCKET, master_key, str(master_local))

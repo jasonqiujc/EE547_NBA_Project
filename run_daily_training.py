@@ -17,6 +17,7 @@ EC2 上每天运行的训练总控脚本。
 """
 
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import List, Union
 
@@ -33,25 +34,20 @@ from train_model import train_model
 #  新增：合并历史主表 + 昨天增量
 # ===============================================================
 
+
 def update_master_player_logs():
-    """从 S3 拉历史主表 + 昨天增量，合并成新的主表并上传回 S3。"""
     print("========== [run_daily_training] Updating master player logs ==========")
 
     s3 = boto3.client("s3", region_name=AWS_REGION)
 
-    # 昨天日期
-    yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
-    daily_fname = f"player_logs_daily_{yesterday.replace('-', '')}.csv"
+    # 用洛杉矶时间算“昨天”
+    now_la = datetime.now(ZoneInfo("America/Los_Angeles"))
+    yesterday = (now_la - timedelta(days=1)).date()
+    daily_fname = f"player_logs_daily_{yesterday.strftime('%Y%m%d')}.csv"
+    print(f"[run_daily_training] Expecting daily file: {daily_fname}")
 
-    # S3 key
     master_key = f"{S3_PREFIX}raw/player_logs_all.csv"
     daily_key = f"{S3_PREFIX}raw/{daily_fname}"
-
-    tmp_dir = Path("/tmp")
-    tmp_dir.mkdir(exist_ok=True)
-
-    master_local = tmp_dir / "player_logs_all.csv"
-    daily_local = tmp_dir / daily_fname
 
     # ----------- 下载历史主表 -----------
     try:

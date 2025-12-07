@@ -2,19 +2,29 @@
 # -*- coding: utf-8 -*-
 
 """
-run_daily_training.py (Enhanced)
+run_daily_training.py
 
 EC2 上每天运行的训练总控脚本。
 
-新增功能（重要！）：
-  - 自动从 S3 合并历史主表 player_logs_all.csv 和最新增量 daily_xxx.csv
-  - 得到新的主表 player_logs_all.csv 并上传回 S3（覆盖旧表）
+流程：
+  0. 重建 master 表 player_logs_all.csv：
+       - 基础：S3 上最新的 player_logs_clean_all_3seasons_plus_current_*.csv
+       - 增量：昨天的 player_logs_daily_YYYYMMDD.csv（如果有）
+       - 输出：覆盖上传 s3://.../raw/player_logs_all.csv
 
-随后流程：
-  1. build_team_features.build_team_features()
-  2. train_model.train_model()
-  3. train_score_model.train_score_model()
+  1. 调用 build_team_features.build_team_features()
+       - 只使用 player_logs_all.csv 作为输入
+       - 生成 data/team_game_features.csv
+       - 同步上传到 S3 raw/team_game_features.csv（在 build_team_features 里完成）
+
+  2. 调用 train_model.train_model()
+       - 读取 team_game_features.csv
+       - 训练 PyTorch 比分模型
+       - 保存到 data/models/model_latest.pth
+       - 上传到 s3://.../models/model_latest.pth
 """
+
+from __future__ import annotations
 
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -26,16 +36,15 @@ import pandas as pd
 
 from config_aws import S3_BUCKET, S3_PREFIX, AWS_REGION
 from build_team_features import build_team_features
-from build_team_features import build_team_features
-from train_model import train_model 
+from train_model import train_model
 
 
 # ===============================================================
-#  新增：合并历史主表 + 昨天增量
+#  Step 0: 重建 master player_logs_all.csv
 # ===============================================================
 
 
-def update_master_player_logs():
+def update_master_player_logs() -> str:
     """
     每天重新构建 player_logs_all.csv：
 
@@ -43,7 +52,7 @@ def update_master_player_logs():
     增量：昨天的 daily CSV（如果存在）
 
     输出：
-        s3://bucket/.../raw/player_logs_all.csv  (覆盖)
+        s3://{S3_BUCKET}/{S3_PREFIX}raw/player_logs_all.csv  (覆盖)
     """
 
     print("========== [run_daily_training] Rebuilding master player logs ==========")
@@ -75,7 +84,10 @@ def update_master_player_logs():
             break
 
     if clean_all_key is None:
-        raise RuntimeError("ERROR: Cannot find clean_all CSV in S3 raw/. Cannot rebuild master.")
+        raise RuntimeError(
+            "ERROR: Cannot find player_logs_clean_all_3seasons_plus_current_*.csv in S3 raw/. "
+            "Cannot rebuild master."
+        )
 
     print(f"[update_master_player_logs] Base clean_all file: {clean_all_key}")
 
@@ -101,6 +113,8 @@ def update_master_player_logs():
         before = len(df_all)
         df_all.drop_duplicates(subset=["GAME_ID", "PLAYER_ID"], inplace=True)
         print(f"[update_master_player_logs] Removed {before - len(df_all)} duplicate rows.")
+    else:
+        print("[update_master_player_logs] WARNING: GAME_ID/PLAYER_ID not found, cannot deduplicate.")
 
     print(f"[update_master_player_logs] Final master rows: {len(df_all)}")
 
@@ -118,6 +132,7 @@ def update_master_player_logs():
 #  原有部分：构建特征 & 模型训练
 # ===============================================================
 
+
 def _normalize_feature_paths(feature_paths) -> List[Union[str, Path]]:
     if feature_paths is None:
         raise ValueError("build_team_features() returned None, expected path(s).")
@@ -125,10 +140,13 @@ def _normalize_feature_paths(feature_paths) -> List[Union[str, Path]]:
         return [feature_paths]
     return list(feature_paths)
 
-def main():
-    # 先更新主表（不动）
-    master_local_path = update_master_player_logs()
 
+def main():
+    # --------- Step 0: 重建 master 表 ----------
+    master_local_path = update_master_player_logs()
+    print(f"[run_daily_training] master_local_path = {master_local_path}")
+
+    # --------- Step 1: 构建球队特征 ----------
     print("\n========== [run_daily_training] Step 1: Build team features ==========")
     feature_paths = build_team_features()
     feature_paths = _normalize_feature_paths(feature_paths)
@@ -142,7 +160,6 @@ def main():
     print(f"\n[{now}] Training complete.")
     print(f"New score model uploaded to: s3://{S3_BUCKET}/{score_model_s3_key}")
     print(f"Latest score model at:       s3://{S3_BUCKET}/{S3_PREFIX}models/model_latest.pth")
-
 
 
 if __name__ == "__main__":

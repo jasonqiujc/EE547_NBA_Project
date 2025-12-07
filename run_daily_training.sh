@@ -28,3 +28,4 @@ python run_daily_training.py >> "$TRAIN_LOG" 2>&1
 echo "=== Training END at $(date) ===" >> "$TRAIN_LOG"
 echo "[CRON] run_daily_training.sh finished at $(date)" >> "$LAUNCHER_LOG"
 
+sudo systemctl restart nba-api.service

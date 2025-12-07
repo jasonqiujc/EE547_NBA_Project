@@ -114,14 +114,13 @@ def fetch_yesterday_player_logs(yesterday_et: date):
     print(f"[player logs] season={season_str}, date={date_str_api} (ET) ...")
 
     resp = leaguegamelog.LeagueGameLog(
-    player_or_team_abbreviation="P",
-    season=season_str,
-    season_type_all_star="Regular Season",
-    date_from_nullable=date_str_api,
-    date_to_nullable=date_str_api,
-    timeout=30,
+        player_or_team_abbreviation="P",
+        season=season_str,
+        season_type_all_star="Regular Season",
+        date_from_nullable=date_str_api,
+        date_to_nullable=date_str_api,
+        timeout=30,
     )
-
 
     df = resp.get_data_frames()[0]
     print(f"[player logs] Raw rows: {len(df)}")
@@ -167,7 +166,6 @@ def build_yesterday_games_from_players(df_players: pd.DataFrame) -> pd.DataFrame
     home = team_stats[team_stats["IS_HOME"]].copy()
     away = team_stats[~team_stats["IS_HOME"]].copy()
 
-
     home = home.rename(columns={
         "TEAM_ABBREVIATION": "HOME_TEAM",
         "PTS": "HOME_SCORE",
@@ -203,6 +201,11 @@ def fetch_schedule_for_date(game_date_et: date) -> pd.DataFrame:
       - GAME_DATE
       - HOME_TEAM
       - AWAY_TEAM
+
+    规则调整：
+      - 如果某些比赛是 NBA 杯 / TBD，对应的 HOME_TEAM_ID / VISITOR_TEAM_ID 可能为 None
+        或者无法映射到 30 支 NBA 球队，这类比赛一律视为“不要算在赛程里”，直接丢弃。
+      - 如果这一天所有比赛都被丢弃，则返回空表（只有表头），相当于“这天对我们来说没有有效比赛”。
     """
     # 调 API 用 MM/DD/YYYY
     date_str_api = game_date_et.strftime("%m/%d/%Y")
@@ -224,9 +227,32 @@ def fetch_schedule_for_date(game_date_et: date) -> pd.DataFrame:
 
     g = game_header[["GAME_DATE_EST", "HOME_TEAM_ID", "VISITOR_TEAM_ID"]].copy()
 
+    # ---------- 关键过滤逻辑：把“奇怪的比赛”都当作没有 ----------
+    # 1) 先丢掉 HOME_TEAM_ID / VISITOR_TEAM_ID 为 None 的行（通常是 NBA 杯 / TBD 对阵）
+    g = g.dropna(subset=["HOME_TEAM_ID", "VISITOR_TEAM_ID"])
+
+    # 2) 尝试转换为数字，无法转换的（依然是奇怪 ID）被转为 NaN 再丢弃
+    g["HOME_TEAM_ID"] = pd.to_numeric(g["HOME_TEAM_ID"], errors="coerce")
+    g["VISITOR_TEAM_ID"] = pd.to_numeric(g["VISITOR_TEAM_ID"], errors="coerce")
+    g = g.dropna(subset=["HOME_TEAM_ID", "VISITOR_TEAM_ID"])
+
+    if g.empty:
+        print("[schedule] All games are NBA Cup / TBD / invalid teams -> treat as no games.")
+        return pd.DataFrame(columns=["GAME_DATE", "HOME_TEAM", "AWAY_TEAM"])
+
+    g["HOME_TEAM_ID"] = g["HOME_TEAM_ID"].astype(int)
+    g["VISITOR_TEAM_ID"] = g["VISITOR_TEAM_ID"].astype(int)
+
     g["GAME_DATE"] = pd.to_datetime(g["GAME_DATE_EST"]).dt.strftime("%Y-%m-%d")
-    g["HOME_TEAM"] = g["HOME_TEAM_ID"].astype(int).map(TEAM_ID_TO_ABBR)
-    g["AWAY_TEAM"] = g["VISITOR_TEAM_ID"].astype(int).map(TEAM_ID_TO_ABBR)
+    g["HOME_TEAM"] = g["HOME_TEAM_ID"].map(TEAM_ID_TO_ABBR)
+    g["AWAY_TEAM"] = g["VISITOR_TEAM_ID"].map(TEAM_ID_TO_ABBR)
+
+    # 3) 如果映射不到 30 支 NBA 球队，也丢弃（视为无效 / 非我们关心的比赛）
+    g = g.dropna(subset=["HOME_TEAM", "AWAY_TEAM"])
+
+    if g.empty:
+        print("[schedule] After filtering NBA Cup / invalid teams, no valid games left for this date.")
+        return pd.DataFrame(columns=["GAME_DATE", "HOME_TEAM", "AWAY_TEAM"])
 
     result = g[["GAME_DATE", "HOME_TEAM", "AWAY_TEAM"]].copy()
     return result

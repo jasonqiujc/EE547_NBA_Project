@@ -36,58 +36,82 @@ from train_model import train_model
 
 
 def update_master_player_logs():
-    print("========== [run_daily_training] Updating master player logs ==========")
+    """
+    每天重新构建 player_logs_all.csv：
+
+    基础：最新的 player_logs_clean_all_3seasons_plus_current_*.csv
+    增量：昨天的 daily CSV（如果存在）
+
+    输出：
+        s3://bucket/.../raw/player_logs_all.csv  (覆盖)
+    """
+
+    print("========== [run_daily_training] Rebuilding master player logs ==========")
 
     s3 = boto3.client("s3", region_name=AWS_REGION)
 
-    # 用洛杉矶时间算“昨天”
+    # ---- 时间计算（洛杉矶时间） ----
     now_la = datetime.now(ZoneInfo("America/Los_Angeles"))
     yesterday = (now_la - timedelta(days=1)).date()
     daily_fname = f"player_logs_daily_{yesterday.strftime('%Y%m%d')}.csv"
-    print(f"[run_daily_training] Expecting daily file: {daily_fname}")
 
-    master_key = f"{S3_PREFIX}raw/player_logs_all.csv"
-    daily_key = f"{S3_PREFIX}raw/{daily_fname}"
+    # S3 keys
+    prefix = f"{S3_PREFIX}raw/"
+    master_key = prefix + "player_logs_all.csv"
+    daily_key = prefix + daily_fname
 
     tmp_dir = Path("/tmp")
     tmp_dir.mkdir(exist_ok=True)
 
-    master_local = tmp_dir / "player_logs_all.csv"
-    daily_local = tmp_dir / daily_fname
+    # ---- 第一步：找到 clean_all 文件 ----
+    resp = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix)
+    contents = resp.get("Contents", [])
 
-    # ----------- 下载历史主表 -----------
-    try:
-        s3.download_file(S3_BUCKET, master_key, str(master_local))
-        df_all = pd.read_csv(master_local)
-        print(f"Loaded master table from S3: {len(df_all)} rows.")
-    except Exception:
-        print("[INFO] Master table not found. Starting fresh.")
-        df_all = pd.DataFrame()
+    clean_all_key = None
+    for obj in contents:
+        fname = obj["Key"].split("/")[-1]
+        if fname.startswith("player_logs_clean_all_3seasons_plus_current"):
+            clean_all_key = obj["Key"]
+            break
 
-    # ----------- 下载昨日增量 -----------
+    if clean_all_key is None:
+        raise RuntimeError("ERROR: Cannot find clean_all CSV in S3 raw/. Cannot rebuild master.")
+
+    print(f"[update_master_player_logs] Base clean_all file: {clean_all_key}")
+
+    clean_all_local = tmp_dir / "clean_all.csv"
+    s3.download_file(S3_BUCKET, clean_all_key, str(clean_all_local))
+
+    df_all = pd.read_csv(clean_all_local)
+    print(f"[update_master_player_logs] Loaded clean_all rows: {len(df_all)}")
+
+    # ---- 第二步：如果存在 daily，就添加进去 ----
     try:
+        daily_local = tmp_dir / daily_fname
         s3.download_file(S3_BUCKET, daily_key, str(daily_local))
         df_daily = pd.read_csv(daily_local)
-        print(f"Loaded daily increment {daily_fname}: {len(df_daily)} rows.")
+        print(f"[update_master_player_logs] Loaded daily: {len(df_daily)} rows.")
+
+        df_all = pd.concat([df_all, df_daily], ignore_index=True)
     except Exception:
-        print(f"[WARN] Missing daily file {daily_key}, skip update.")
-        return str(master_local)  # 用旧主表继续 pipeline
+        print(f"[update_master_player_logs] No daily file for {daily_fname}, skip daily append.")
 
-    # ----------- 合并并去重 -----------
-    df_new = pd.concat([df_all, df_daily], ignore_index=True)
+    # ---- 去重 ----
+    if {"GAME_ID", "PLAYER_ID"}.issubset(df_all.columns):
+        before = len(df_all)
+        df_all.drop_duplicates(subset=["GAME_ID", "PLAYER_ID"], inplace=True)
+        print(f"[update_master_player_logs] Removed {before - len(df_all)} duplicate rows.")
 
-    # 按你的数据结构，GAME_ID + PLAYER_ID 是唯一键
-    if {"GAME_ID", "PLAYER_ID"}.issubset(df_new.columns):
-        df_new.drop_duplicates(subset=["GAME_ID", "PLAYER_ID"], inplace=True)
+    print(f"[update_master_player_logs] Final master rows: {len(df_all)}")
 
-    print(f"Merged new master: {len(df_new)} rows total.")
+    # ---- 第三步：保存并上传为 player_logs_all.csv ----
+    master_local = tmp_dir / "player_logs_all.csv"
+    df_all.to_csv(master_local, index=False)
 
-    # ----------- 保存并上传新主表 -----------
-    df_new.to_csv(master_local, index=False)
     s3.upload_file(str(master_local), S3_BUCKET, master_key)
-    print(f"Updated master table uploaded to s3://{S3_BUCKET}/{master_key}")
+    print(f"[update_master_player_logs] Uploaded master to s3://{S3_BUCKET}/{master_key}")
 
-    return str(master_local)  # 返回新主表的本地路径
+    return str(master_local)
 
 
 # ===============================================================

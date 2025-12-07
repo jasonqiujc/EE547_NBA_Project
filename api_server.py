@@ -102,13 +102,13 @@ class PredictionResponse(BaseModel):
 
 
 def _today_et() -> datetime:
+    """使用洛杉矶时间（NBA 常用的太平洋时区）作为 today"""
     return datetime.now(ZoneInfo("America/Los_Angeles"))
 
 
-
-
-def _today_et() -> datetime:
-    return datetime.now(ZoneInfo("America/Los_Angeles"))
+def _yesterday_et() -> datetime:
+    """昨天 = today - 1 天（同一时区下计算）"""
+    return _today_et() - timedelta(days=1)
 
 
 def _date_to_str(d: datetime) -> str:

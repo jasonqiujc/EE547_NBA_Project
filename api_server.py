@@ -38,6 +38,7 @@ import boto3
 
 # 从新的 train_model.py 中导入模型结构 & 特征列 & 模型目录
 from train_model import MLPRegressor, FEATURE_COLUMNS, MODEL_DIR
+from zoneinfo import ZoneInfo 
 
 
 # -------------------- FastAPI app -------------------- #
@@ -99,13 +100,15 @@ class PredictionResponse(BaseModel):
 
 # -------------------- Helpers: dates & files -------------------- #
 
+
 def _today_et() -> datetime:
-    """简单版：用本地时间近似 ET。如果你严格要 ET，可以用 pytz / zoneinfo。"""
-    return datetime.now()
+    return datetime.now(ZoneInfo("America/Los_Angeles"))
 
 
-def _yesterday_et() -> datetime:
-    return _today_et() - timedelta(days=1)
+
+
+def _today_et() -> datetime:
+    return datetime.now(ZoneInfo("America/Los_Angeles"))
 
 
 def _date_to_str(d: datetime) -> str:

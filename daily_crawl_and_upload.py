@@ -2,11 +2,12 @@
 # daily_crawl_and_upload.py
 
 """
-每天增量爬虫：
-  1) 抓取昨天所有球员比赛日志（player level）
-  2) 用球员日志计算昨天每场比赛的主客队+比分（game level）
-  3) 抓取今天 + 未来 4 天的赛程（没有比分）
-  4) 所有结果保存到 LOCAL_DATA_DIR 并上传到 S3 raw/ 下面
+Daily incremental crawler:
+
+  1) Fetch yesterday's player game logs (player level)
+  2) Aggregate player logs to build yesterday's game results (team level)
+  3) Fetch today's + next 4 days' schedule (no scores)
+  4) Save everything to LOCAL_DATA_DIR and upload to S3 under raw/
 """
 
 from datetime import datetime, timedelta, date
@@ -21,7 +22,12 @@ from zoneinfo import ZoneInfo  # Python 3.9+
 
 from config_aws import LOCAL_DATA_DIR, AWS_REGION, S3_BUCKET, S3_PREFIX
 
-# ----------------- NBA team id -> 缩写，用于赛程 ----------------- #
+# ----------------- Global time zone (Los Angeles / Pacific Time) ----------------- #
+
+NBA_TZ = ZoneInfo("America/Los_Angeles")
+
+# ----------------- NBA team id -> abbreviation (for schedule) ----------------- #
+
 TEAM_ID_TO_ABBR: Dict[int, str] = {
     1610612737: "ATL",
     1610612738: "BOS",
@@ -56,25 +62,29 @@ TEAM_ID_TO_ABBR: Dict[int, str] = {
 }
 
 
-# ----------------- 时间：统一按美东算 ----------------- #
+# ----------------- Time helpers: use Los Angeles time ----------------- #
 
-def get_today_yesterday_et() -> Tuple[date, date]:
-    """返回 (today_et, yesterday_et)，按美西时间计算。"""
-    now_et = datetime.now(ZoneInfo("America/Los_Angeles"))
-    today_et = now_et.date()
-    yesterday_et = today_et - timedelta(days=1)
-    return today_et, yesterday_et
+def get_today_yesterday_la() -> Tuple[date, date]:
+    """
+    Return (today_la, yesterday_la) based on Los Angeles time.
+
+    This is what we use to define "yesterday's games" for crawling.
+    """
+    now_la = datetime.now(NBA_TZ)
+    today_la = now_la.date()
+    yesterday_la = today_la - timedelta(days=1)
+    return today_la, yesterday_la
 
 
-# ----------------- 自动判断赛季 ----------------- #
+# ----------------- Season helper ----------------- #
 
 def get_current_season(d: date) -> str:
     """
-    根据日期判断 NBA 赛季字符串，如 '2024-25'、'2025-26'。
+    Infer NBA season string like '2024-25' or '2025-26' from a date.
 
-    规则：NBA 新赛季从每年 10 月开始。
-      - 10,11,12 月：赛季起始年 = 当前年
-      - 1~9 月：赛季起始年 = 当前年 - 1
+    Rule: NBA season starts in October.
+      - Month 10, 11, 12: season start year = current year
+      - Month 1..9:       season start year = current year - 1
     """
     if d.month >= 10:
         start_year = d.year
@@ -84,9 +94,10 @@ def get_current_season(d: date) -> str:
     return f"{start_year}-{str(end_year)[-2:]}"
 
 
-# ----------------- 工具：Scoreboard 结果转 dict[name] -> DataFrame ----------------- #
+# ----------------- Utility: ScoreboardV2 -> dict[name] -> DataFrame ----------------- #
 
 def scoreboard_frames(sb: scoreboardv2.ScoreboardV2):
+    """Convert ScoreboardV2 response to a dict of DataFrames keyed by resultSet name."""
     data = sb.get_dict()
     frames = {}
     for rs in data.get("resultSets", []):
@@ -97,21 +108,24 @@ def scoreboard_frames(sb: scoreboardv2.ScoreboardV2):
     return frames
 
 
-# ----------------- 1) 昨天球员日志 ----------------- #
+# ----------------- 1) Yesterday player logs ----------------- #
 
-def fetch_yesterday_player_logs(yesterday_et: date):
+def fetch_yesterday_player_logs(yesterday_la: date):
     """
-    抓取昨天的球员 logs，返回 DataFrame 和日期字符串：
-      - date_str_file: 'YYYY-MM-DD'（用于文件名）
+    Fetch yesterday's player logs.
+
+    Returns:
+      - df: DataFrame of player logs for that date
+      - date_str_file: 'YYYY-MM-DD' string used in filenames
     """
-    # 文件名用 YYYY-MM-DD，方便你现有 pipeline
-    date_str_file = yesterday_et.strftime("%Y-%m-%d")
-    # 调 API 用 MM/DD/YYYY（nba_api 通常这样）
-    date_str_api = yesterday_et.strftime("%m/%d/%Y")
+    # File naming: YYYY-MM-DD (easy for the pipeline)
+    date_str_file = yesterday_la.strftime("%Y-%m-%d")
+    # NBA API usually expects MM/DD/YYYY
+    date_str_api = yesterday_la.strftime("%m/%d/%Y")
 
-    season_str = get_current_season(yesterday_et)
+    season_str = get_current_season(yesterday_la)
 
-    print(f"[player logs] season={season_str}, date={date_str_api} (ET) ...")
+    print(f"[player logs] season={season_str}, date={date_str_api} (LA-based date) ...")
 
     resp = leaguegamelog.LeagueGameLog(
         player_or_team_abbreviation="P",
@@ -134,9 +148,9 @@ def fetch_yesterday_player_logs(yesterday_et: date):
 
 def build_yesterday_games_from_players(df_players: pd.DataFrame) -> pd.DataFrame:
     """
-    用昨天的球员 logs，构造每场比赛的主客队 + 比分：
+    Build team-level game results from yesterday's player logs.
 
-    输出列：
+    Output columns:
       - GAME_DATE
       - HOME_TEAM
       - AWAY_TEAM
@@ -150,17 +164,19 @@ def build_yesterday_games_from_players(df_players: pd.DataFrame) -> pd.DataFrame
     required = {"GAME_ID", "TEAM_ABBREVIATION", "GAME_DATE", "MATCHUP", "PTS"}
     missing = required - set(df_players.columns)
     if missing:
-        raise ValueError(f"player logs 缺少列：{missing}")
+        raise ValueError(f"player logs missing columns: {missing}")
 
-    # 每队每场的总得分 + 对应 MATCHUP
+    # Aggregate to team-level total points per game + MATCHUP
     team_stats = (
         df_players
         .groupby(["GAME_ID", "TEAM_ABBREVIATION", "GAME_DATE", "MATCHUP"], as_index=False)["PTS"]
         .sum()
     )
 
-    # MATCHUP 中： 'XXX vs YYY' = XXX 主场； 'XXX @ YYY' = XXX 客场
-    # 更稳的写法：只要含有 '@' 就是客场，否则视为主场
+    # MATCHUP:
+    #   'XXX vs YYY'  -> XXX is home
+    #   'XXX @ YYY'   -> XXX is away
+    # Safer rule: if contains '@' => away, otherwise home
     team_stats["IS_HOME"] = ~team_stats["MATCHUP"].str.contains("@")
 
     home = team_stats[team_stats["IS_HOME"]].copy()
@@ -181,35 +197,36 @@ def build_yesterday_games_from_players(df_players: pd.DataFrame) -> pd.DataFrame
         how="inner",
     )
 
-    # 确保日期格式统一
+    # Normalize date format
     games["GAME_DATE"] = pd.to_datetime(games["GAME_DATE"]).dt.strftime("%Y-%m-%d")
 
-    # 一场比赛一行
+    # One row per game
     games = games[["GAME_DATE", "HOME_TEAM", "AWAY_TEAM", "HOME_SCORE", "AWAY_SCORE"]].drop_duplicates()
 
     print(f"[games-from-players] built {len(games)} games")
     return games
 
 
-# ----------------- 2) 赛程（今天 + 未来 4 天） ----------------- #
+# ----------------- 2) Schedule (today + next 4 days) ----------------- #
 
-def fetch_schedule_for_date(game_date_et: date) -> pd.DataFrame:
+def fetch_schedule_for_date(game_date_la: date) -> pd.DataFrame:
     """
-    用 ScoreboardV2 抓某一天的赛程。
+    Fetch schedule for a given date using ScoreboardV2.
 
-    输出列：
-      - GAME_DATE
+    Input date is interpreted as an LA (PT) date; we pass the same calendar
+    date to NBA API. This is safe as long as the crawler runs after all
+    games of that calendar day have finished.
+
+    Output columns:
+      - GAME_DATE   (YYYY-MM-DD, based on GAME_DATE_EST from API)
       - HOME_TEAM
       - AWAY_TEAM
-
-    规则调整：
-      - 如果某些比赛是 NBA 杯 / TBD，对应的 HOME_TEAM_ID / VISITOR_TEAM_ID 可能为 None
-        或者无法映射到 30 支 NBA 球队，这类比赛一律视为“不要算在赛程里”，直接丢弃。
-      - 如果这一天所有比赛都被丢弃，则返回空表（只有表头），相当于“这天对我们来说没有有效比赛”。
+      - HOME_TEAM_ID
+      - AWAY_TEAM_ID
+      - IS_TBD      (True if matchup is not fully determined)
     """
-    # 调 API 用 MM/DD/YYYY
-    date_str_api = game_date_et.strftime("%m/%d/%Y")
-    print(f"[schedule] Fetching schedule for {date_str_api} (ET) ...")
+    date_str_api = game_date_la.strftime("%m/%d/%Y")
+    print(f"[schedule] Fetching schedule for {date_str_api} (LA-based date) ...")
 
     sb = scoreboardv2.ScoreboardV2(
         game_date=date_str_api,
@@ -223,45 +240,51 @@ def fetch_schedule_for_date(game_date_et: date) -> pd.DataFrame:
     print(f"[schedule] GameHeader rows={len(game_header)}")
 
     if game_header.empty:
-        return pd.DataFrame(columns=["GAME_DATE", "HOME_TEAM", "AWAY_TEAM"])
+        return pd.DataFrame(columns=[
+            "GAME_DATE", "HOME_TEAM", "AWAY_TEAM",
+            "HOME_TEAM_ID", "AWAY_TEAM_ID", "IS_TBD"
+        ])
 
     g = game_header[["GAME_DATE_EST", "HOME_TEAM_ID", "VISITOR_TEAM_ID"]].copy()
 
-    # ---------- 关键过滤逻辑：把“奇怪的比赛”都当作没有 ----------
-    # 1) 先丢掉 HOME_TEAM_ID / VISITOR_TEAM_ID 为 None 的行（通常是 NBA 杯 / TBD 对阵）
-    g = g.dropna(subset=["HOME_TEAM_ID", "VISITOR_TEAM_ID"])
-
-    # 2) 尝试转换为数字，无法转换的（依然是奇怪 ID）被转为 NaN 再丢弃
+    # Keep original IDs and detect TBD games
     g["HOME_TEAM_ID"] = pd.to_numeric(g["HOME_TEAM_ID"], errors="coerce")
     g["VISITOR_TEAM_ID"] = pd.to_numeric(g["VISITOR_TEAM_ID"], errors="coerce")
-    g = g.dropna(subset=["HOME_TEAM_ID", "VISITOR_TEAM_ID"])
 
-    if g.empty:
-        print("[schedule] All games are NBA Cup / TBD / invalid teams -> treat as no games.")
-        return pd.DataFrame(columns=["GAME_DATE", "HOME_TEAM", "AWAY_TEAM"])
+    # If either side is NaN, treat as TBD matchup
+    g["IS_TBD"] = g["HOME_TEAM_ID"].isna() | g["VISITOR_TEAM_ID"].isna()
 
-    g["HOME_TEAM_ID"] = g["HOME_TEAM_ID"].astype(int)
-    g["VISITOR_TEAM_ID"] = g["VISITOR_TEAM_ID"].astype(int)
-
+    # Map to team abbreviations where possible
     g["GAME_DATE"] = pd.to_datetime(g["GAME_DATE_EST"]).dt.strftime("%Y-%m-%d")
     g["HOME_TEAM"] = g["HOME_TEAM_ID"].map(TEAM_ID_TO_ABBR)
     g["AWAY_TEAM"] = g["VISITOR_TEAM_ID"].map(TEAM_ID_TO_ABBR)
 
-    # 3) 如果映射不到 30 支 NBA 球队，也丢弃（视为无效 / 非我们关心的比赛）
-    g = g.dropna(subset=["HOME_TEAM", "AWAY_TEAM"])
+    # For TBD games, fill missing team abbr with 'TBD'
+    g.loc[g["IS_TBD"] & g["HOME_TEAM"].isna(), "HOME_TEAM"] = "TBD"
+    g.loc[g["IS_TBD"] & g["AWAY_TEAM"].isna(), "AWAY_TEAM"] = "TBD"
+
+    # Drop truly broken rows (no date at all)
+    g = g.dropna(subset=["GAME_DATE"])
 
     if g.empty:
-        print("[schedule] After filtering NBA Cup / invalid teams, no valid games left for this date.")
-        return pd.DataFrame(columns=["GAME_DATE", "HOME_TEAM", "AWAY_TEAM"])
+        print("[schedule] After cleaning, no games left for this date.")
+        return pd.DataFrame(columns=[
+            "GAME_DATE", "HOME_TEAM", "AWAY_TEAM",
+            "HOME_TEAM_ID", "AWAY_TEAM_ID", "IS_TBD"
+        ])
 
-    result = g[["GAME_DATE", "HOME_TEAM", "AWAY_TEAM"]].copy()
+    result = g[[
+        "GAME_DATE", "HOME_TEAM", "AWAY_TEAM",
+        "HOME_TEAM_ID", "VISITOR_TEAM_ID", "IS_TBD"
+    ]].copy()
+    result = result.rename(columns={"VISITOR_TEAM_ID": "AWAY_TEAM_ID"})
     return result
 
 
-# ----------------- 上传到 S3 的小工具 ----------------- #
+# ----------------- S3 upload helper ----------------- #
 
 def upload_to_s3(local_path: Path, s3_key: str) -> None:
-    """上传本地文件到 S3."""
+    """Upload a local file to S3."""
     s3 = boto3.client("s3", region_name=AWS_REGION)
     print(f"[upload] {local_path} -> s3://{S3_BUCKET}/{s3_key}")
     try:
@@ -279,16 +302,16 @@ def upload_to_s3(local_path: Path, s3_key: str) -> None:
 def main():
     LOCAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    today_et, yesterday_et = get_today_yesterday_et()
-    print(f"[time] ET today={today_et}, yesterday={yesterday_et}")
+    today_la, yesterday_la = get_today_yesterday_la()
+    print(f"[time] LA today={today_la}, yesterday={yesterday_la}")
 
-    # --------------- 1) 昨天的球员日志 ---------------- #
-    df_players, y_str_file = fetch_yesterday_player_logs(yesterday_et)
+    # --------------- 1) Yesterday player logs ---------------- #
+    df_players, y_str_file = fetch_yesterday_player_logs(yesterday_la)
 
     if df_players.empty:
-        print("[player logs] No games found for yesterday -> 不产生增量 player_logs 文件。")
+        print("[player logs] No games found for yesterday -> no incremental player_logs file.")
     else:
-        # 保存 & 上传昨天的球员增量
+        # Save & upload yesterday's incremental player logs
         fname_players = f"player_logs_daily_{y_str_file.replace('-', '')}.csv"
         local_players = LOCAL_DATA_DIR / fname_players
         print(f"[player logs] Saving to {local_players}")
@@ -297,7 +320,7 @@ def main():
         s3_key_players = f"{S3_PREFIX}raw/{fname_players}"
         upload_to_s3(local_players, s3_key_players)
 
-    # --------------- 2) 昨天的赛程 + 结果（用球员 logs 算） ---------------- #
+    # --------------- 2) Yesterday games (built from player logs) ---------------- #
     df_yesterday_games = build_yesterday_games_from_players(df_players)
 
     fname_games = f"games_yesterday_{y_str_file.replace('-', '')}.csv"
@@ -308,23 +331,23 @@ def main():
     s3_key_games = f"{S3_PREFIX}raw/{fname_games}"
     upload_to_s3(local_games, s3_key_games)
 
-    # --------------- 3) 今天 + 未来 4 天的赛程 ---------------- #
-    for i in range(0, 5):  # today_et + 0..4
-        d = today_et + timedelta(days=i)
+    # --------------- 3) Today + next 4 days schedule ---------------- #
+    for i in range(0, 5):  # today_la + 0..4
+        d = today_la + timedelta(days=i)
         d_str_file = d.strftime("%Y%m%d")
 
         df_sched = fetch_schedule_for_date(d)
 
         fname_sched = f"schedule_{d_str_file}.csv"
         local_sched = LOCAL_DATA_DIR / fname_sched
-        print(f"[schedule] Saving schedule for {d} to {local_sched}")
-        # 没有比赛也会生成只有表头的 CSV
+        print(f"[schedule] Saving schedule for {d} (LA date) to {local_sched}")
+        # Even if there are no games, we still create an empty CSV with header
         df_sched.to_csv(local_sched, index=False)
 
         s3_key_sched = f"{S3_PREFIX}raw/{fname_sched}"
         upload_to_s3(local_sched, s3_key_sched)
 
-    print("Done daily crawl: player logs + yesterday games + next 5 days schedule (ET-based).")
+    print("Done daily crawl: player logs + yesterday games + next 5 days schedule (LA-based).")
 
 
 if __name__ == "__main__":

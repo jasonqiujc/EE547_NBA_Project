@@ -59,8 +59,8 @@ TEAM_ID_TO_ABBR: Dict[int, str] = {
 # ----------------- 时间：统一按美东算 ----------------- #
 
 def get_today_yesterday_et() -> Tuple[date, date]:
-    """返回 (today_et, yesterday_et)，按美东时间计算。"""
-    now_et = datetime.now(ZoneInfo("America/New_York"))
+    """返回 (today_et, yesterday_et)，按美西时间计算。"""
+    now_et = datetime.now(ZoneInfo("America/Los_Angeles"))
     today_et = now_et.date()
     yesterday_et = today_et - timedelta(days=1)
     return today_et, yesterday_et

@@ -4,12 +4,12 @@
 """
 train_model_pytorch.py
 
-功能：
-  - 加载多个 feature CSV
-  - 构建训练/验证集
-  - 训练一个 PyTorch MLP 回归模型用于预测两队得分
-  - 保存 best model 到本地
-  - 上传模型到 S3:
+Responsibilities:
+  - Load one or more feature CSV files
+  - Build train/validation datasets
+  - Train a PyTorch MLP regression model predicting both teams' scores
+  - Save the best model locally
+  - Upload two model versions to S3:
         models/model_YYYYMMDD.pth
         models/model_latest.pth
 """
@@ -31,8 +31,9 @@ from torch.utils.data import Dataset, DataLoader, random_split
 
 from config_aws import AWS_REGION, S3_BUCKET, S3_PREFIX, LOCAL_DATA_DIR
 
+
 # ------------------------------------------------------
-# 配置
+# Configuration
 # ------------------------------------------------------
 FEATURE_COLUMNS = [
     "roll5_PTS_FOR",
@@ -44,19 +45,21 @@ FEATURE_COLUMNS = [
     "season_win_rate",
 ]
 
+# Score columns from your feature CSV
 SCORE_COLUMNS = ["PTS_FOR", "PTS_AGAINST"]
-  # 你 CSV 中存最终比分的两列名
 
 MODEL_DIR = LOCAL_DATA_DIR / "models"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
+
 
 # ------------------------------------------------------
 # Dataset
 # ------------------------------------------------------
 class NBADataset(Dataset):
+    """Simple dataset for score prediction."""
+
     def __init__(self, df: pd.DataFrame):
-        df = df.fillna(0)
-        df = df.replace([np.inf, -np.inf], 0)
+        df = df.fillna(0).replace([np.inf, -np.inf], 0)
 
         self.X = df[FEATURE_COLUMNS].values.astype("float32")
         self.y = df[SCORE_COLUMNS].values.astype("float32")
@@ -67,10 +70,13 @@ class NBADataset(Dataset):
     def __getitem__(self, idx):
         return self.X[idx], self.y[idx]
 
+
 # ------------------------------------------------------
 # MLP Model
 # ------------------------------------------------------
 class MLPRegressor(nn.Module):
+    """Multi-layer perceptron used for score regression."""
+
     def __init__(self, input_dim, hidden_dims=[512, 256, 128], dropout=0.2):
         super().__init__()
         layers = []
@@ -81,14 +87,15 @@ class MLPRegressor(nn.Module):
             layers.append(nn.Dropout(dropout))
             input_dim = h
 
-        layers.append(nn.Linear(input_dim, 2))  # 输出：两队得分
+        layers.append(nn.Linear(input_dim, 2))  # Output = [score_for, score_against]
         self.net = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.net(x)
 
+
 # ------------------------------------------------------
-# Load multiple CSVs
+# Load multiple CSV feature files
 # ------------------------------------------------------
 def load_feature_files(paths: List[Union[str, Path]]) -> pd.DataFrame:
     dfs = []
@@ -101,8 +108,9 @@ def load_feature_files(paths: List[Union[str, Path]]) -> pd.DataFrame:
     print(f"[INFO] Total rows: {len(df_all)}")
     return df_all
 
+
 # ------------------------------------------------------
-# S3 Upload
+# Upload helper
 # ------------------------------------------------------
 def upload_to_s3(local_path: Path, s3_key: str):
     print(f"[S3] Uploading {local_path} → s3://{S3_BUCKET}/{s3_key}")
@@ -118,18 +126,19 @@ def upload_to_s3(local_path: Path, s3_key: str):
         print(f"[ERROR] Upload failed: {e}")
         raise
 
+
 # ------------------------------------------------------
-# Train Model
+# Training logic
 # ------------------------------------------------------
 def train_model(feature_paths: List[Union[str, Path]]) -> str:
-    # 1. 加载 CSV
+    # Load CSV files
     df = load_feature_files(feature_paths)
 
-    # 2. 构建 Dataset
+    # Build dataset
     dataset = NBADataset(df)
     num_samples = len(dataset)
 
-    # 3. 划分训练 / 验证
+    # Train/validation split
     val_size = int(0.1 * num_samples)
     train_size = num_samples - val_size
     train_data, val_data = random_split(dataset, [train_size, val_size])
@@ -139,20 +148,20 @@ def train_model(feature_paths: List[Union[str, Path]]) -> str:
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # 4. 初始化模型
+    # Model
     model = MLPRegressor(input_dim=len(FEATURE_COLUMNS)).to(device)
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     best_loss = float("inf")
 
-    # 时间戳模型文件名
+    # Model filenames
     ts = datetime.now().strftime("%Y%m%d")
     local_ts = MODEL_DIR / f"model_{ts}.pth"
     local_latest = MODEL_DIR / "model_latest.pth"
 
-    # 5. Train Loop
-    for epoch in range(1, 501):  # 训练 500 epoch
+    # Training loop
+    for epoch in range(1, 501):
         model.train()
         train_loss = 0.0
 
@@ -178,21 +187,20 @@ def train_model(feature_paths: List[Union[str, Path]]) -> str:
                 X = X.to(device)
                 y = y.to(device)
                 pred = model(X)
-                loss = criterion(pred, y)
-                val_loss += loss.item()
+                val_loss += criterion(pred, y).item()
 
         val_loss /= len(val_loader)
 
         print(f"[Epoch {epoch}] Train={train_loss:.4f} | Val={val_loss:.4f}")
 
-        # Save best model
+        # Save best weights
         if val_loss < best_loss:
             best_loss = val_loss
             torch.save(model.state_dict(), local_ts)
             torch.save(model.state_dict(), local_latest)
             print(f"  💾 Saved best model → {local_ts}")
 
-    # 6. 上传到 S3
+    # Upload to S3
     base_prefix = f"{S3_PREFIX}models/"
     key_ts = f"{base_prefix}model_{ts}.pth"
     key_latest = f"{base_prefix}model_latest.pth"
@@ -200,7 +208,7 @@ def train_model(feature_paths: List[Union[str, Path]]) -> str:
     upload_to_s3(local_ts, key_ts)
     upload_to_s3(local_latest, key_latest)
 
-    print(f"[DONE] Best model uploaded: {key_ts}")
+    print(f"[DONE] Best model uploaded:   {key_ts}")
     print(f"[DONE] Latest model uploaded: {key_latest}")
 
     return key_ts
@@ -208,5 +216,4 @@ def train_model(feature_paths: List[Union[str, Path]]) -> str:
 
 if __name__ == "__main__":
     print("train_model_pytorch.py should be called by run_daily_training.py")
-
 

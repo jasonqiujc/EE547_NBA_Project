@@ -4,24 +4,23 @@
 """
 run_daily_training.py
 
-EC2 上每天运行的训练总控脚本。
+Daily training controller script for EC2.
 
-流程：
-  0. 重建 master 表 player_logs_all.csv：
-       - 基础：S3 上最新的 player_logs_clean_all_3seasons_plus_current_*.csv
-       - 增量：昨天的 player_logs_daily_YYYYMMDD.csv（如果有）
-       - 输出：覆盖上传 s3://.../raw/player_logs_all.csv
+Workflow:
+  0. Rebuild master player_logs_all.csv:
+       - Base: latest player_logs_clean_all_3seasons_plus_current_*.csv (from S3)
+       - Incremental: yesterday's player_logs_daily_YYYYMMDD.csv (if exists)
+       - Output: upload/overwrite raw/player_logs_all.csv on S3
 
-  1. 调用 build_team_features.build_team_features()
-       - 只使用 player_logs_all.csv 作为输入
-       - 生成 data/team_game_features.csv
-       - 同步上传到 S3 raw/team_game_features.csv（在 build_team_features 里完成）
+  1. Run build_team_features():
+       - Uses player_logs_all.csv as single source
+       - Generates team_game_features.csv
+       - Upload handled inside build_team_features()
 
-  2. 调用 train_model.train_model()
-       - 读取 team_game_features.csv
-       - 训练 PyTorch 比分模型
-       - 保存到 data/models/model_latest.pth
-       - 上传到 s3://.../models/model_latest.pth
+  2. Run train_model():
+       - Train PyTorch score model using team features
+       - Save model_latest.pth locally
+       - Upload model_latest.pth to S3
 """
 
 from __future__ import annotations
@@ -40,31 +39,27 @@ from train_model import train_model
 
 
 # ===============================================================
-#  Step 0: 重建 master player_logs_all.csv
+# Step 0: Rebuild master player_logs_all.csv
 # ===============================================================
-
 
 def update_master_player_logs() -> str:
     """
-    每天重新构建 player_logs_all.csv：
-
-    基础：最新的 player_logs_clean_all_3seasons_plus_current_*.csv
-    增量：昨天的 daily CSV（如果存在）
-
-    输出：
-        s3://{S3_BUCKET}/{S3_PREFIX}raw/player_logs_all.csv  (覆盖)
+    Rebuild player_logs_all.csv by:
+      - Loading the latest clean_all CSV from S3
+      - Appending yesterday's daily logs (if available)
+      - Removing duplicates
+      - Uploading the new master CSV back to S3
     """
 
     print("========== [run_daily_training] Rebuilding master player logs ==========")
 
     s3 = boto3.client("s3", region_name=AWS_REGION)
 
-    # ---- 时间计算（洛杉矶时间） ----
+    # Determine yesterday's date in LA timezone
     now_la = datetime.now(ZoneInfo("America/Los_Angeles"))
     yesterday = (now_la - timedelta(days=1)).date()
     daily_fname = f"player_logs_daily_{yesterday.strftime('%Y%m%d')}.csv"
 
-    # S3 keys
     prefix = f"{S3_PREFIX}raw/"
     master_key = prefix + "player_logs_all.csv"
     daily_key = prefix + daily_fname
@@ -72,7 +67,7 @@ def update_master_player_logs() -> str:
     tmp_dir = Path("/tmp")
     tmp_dir.mkdir(exist_ok=True)
 
-    # ---- 第一步：找到 clean_all 文件 ----
+    # Find the base clean_all file
     resp = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix)
     contents = resp.get("Contents", [])
 
@@ -85,7 +80,7 @@ def update_master_player_logs() -> str:
 
     if clean_all_key is None:
         raise RuntimeError(
-            "ERROR: Cannot find player_logs_clean_all_3seasons_plus_current_*.csv in S3 raw/. "
+            "ERROR: Missing player_logs_clean_all_3seasons_plus_current_*.csv in raw/. "
             "Cannot rebuild master."
         )
 
@@ -97,28 +92,27 @@ def update_master_player_logs() -> str:
     df_all = pd.read_csv(clean_all_local)
     print(f"[update_master_player_logs] Loaded clean_all rows: {len(df_all)}")
 
-    # ---- 第二步：如果存在 daily，就添加进去 ----
+    # Append daily logs if available
     try:
         daily_local = tmp_dir / daily_fname
         s3.download_file(S3_BUCKET, daily_key, str(daily_local))
         df_daily = pd.read_csv(daily_local)
         print(f"[update_master_player_logs] Loaded daily: {len(df_daily)} rows.")
-
         df_all = pd.concat([df_all, df_daily], ignore_index=True)
     except Exception:
-        print(f"[update_master_player_logs] No daily file for {daily_fname}, skip daily append.")
+        print(f"[update_master_player_logs] No daily file for {daily_fname}, skipping append.")
 
-    # ---- 去重 ----
+    # Deduplicate
     if {"GAME_ID", "PLAYER_ID"}.issubset(df_all.columns):
         before = len(df_all)
         df_all.drop_duplicates(subset=["GAME_ID", "PLAYER_ID"], inplace=True)
         print(f"[update_master_player_logs] Removed {before - len(df_all)} duplicate rows.")
     else:
-        print("[update_master_player_logs] WARNING: GAME_ID/PLAYER_ID not found, cannot deduplicate.")
+        print("[update_master_player_logs] WARNING: GAME_ID/PLAYER_ID missing; cannot deduplicate.")
 
     print(f"[update_master_player_logs] Final master rows: {len(df_all)}")
 
-    # ---- 第三步：保存并上传为 player_logs_all.csv ----
+    # Save and upload master file
     master_local = tmp_dir / "player_logs_all.csv"
     df_all.to_csv(master_local, index=False)
 
@@ -129,38 +123,41 @@ def update_master_player_logs() -> str:
 
 
 # ===============================================================
-#  原有部分：构建特征 & 模型训练
+# Step 1 & 2: Feature building and model training
 # ===============================================================
 
-
 def _normalize_feature_paths(feature_paths) -> List[Union[str, Path]]:
+    """
+    Ensure build_team_features() return value is a list of paths.
+    """
     if feature_paths is None:
-        raise ValueError("build_team_features() returned None, expected path(s).")
+        raise ValueError("build_team_features() returned None; expected path(s).")
     if isinstance(feature_paths, (str, Path)):
         return [feature_paths]
     return list(feature_paths)
 
 
 def main():
-    # --------- Step 0: 重建 master 表 ----------
+    # Step 0: Rebuild master CSV
     master_local_path = update_master_player_logs()
     print(f"[run_daily_training] master_local_path = {master_local_path}")
 
-    # --------- Step 1: 构建球队特征 ----------
+    # Step 1: Build team features
     print("\n========== [run_daily_training] Step 1: Build team features ==========")
     feature_paths = build_team_features()
     feature_paths = _normalize_feature_paths(feature_paths)
     print("[run_daily_training] Feature files:", feature_paths)
 
-    # --------- Step 2: 训练 PyTorch 比分模型 ----------
-    print("\n========== [run_daily_training] Step 2: Train score model (PyTorch) ==========")
-    score_model_s3_key = train_model(feature_paths)   # train_model 返回 .pth 的 key
+    # Step 2: Train PyTorch score model
+    print("\n========== [run_daily_training] Step 2: Train score model ==========")
+    score_model_s3_key = train_model(feature_paths)
 
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     print(f"\n[{now}] Training complete.")
     print(f"New score model uploaded to: s3://{S3_BUCKET}/{score_model_s3_key}")
-    print(f"Latest score model at:       s3://{S3_BUCKET}/{S3_PREFIX}models/model_latest.pth")
+    print(f"Latest model:               s3://{S3_BUCKET}/{S3_PREFIX}models/model_latest.pth")
 
 
 if __name__ == "__main__":
     main()
+

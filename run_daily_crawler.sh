@@ -6,22 +6,21 @@ LOG_DIR="$PROJECT_DIR/logs"
 PYTHON_BIN="$PROJECT_DIR/venv/bin/python"
 CRAWLER_LOG="$LOG_DIR/crawler_$(date +"%Y%m%d").log"
 
-# 确保日志目录存在
+# Ensure log directory exists
 mkdir -p "$LOG_DIR"
 
-# 记录启动时间（写入 cron log）
+# Record cron trigger time
 echo "[run_daily_crawler.sh] started at $(date)" >> "$LOG_DIR/cron_launcher.log"
 
-# 切换到项目目录
 cd "$PROJECT_DIR"
 
-# 写入一些 debug 信息（方便定位问题）
+# Basic debug info
 echo "=== Running crawler at $(date) ===" >> "$CRAWLER_LOG"
-echo "Using Python: $PYTHON_BIN" >> "$CRAWLER_LOG"
+echo "Python: $PYTHON_BIN" >> "$CRAWLER_LOG"
 echo "PWD: $(pwd)" >> "$CRAWLER_LOG"
 
-# 运行 Python 程序
+# Execute crawler script
 "$PYTHON_BIN" "$PROJECT_DIR/daily_crawl_and_upload.py" >> "$CRAWLER_LOG" 2>&1
 
-# 完成时间
+# Completion time
 echo "[run_daily_crawler.sh] finished at $(date)" >> "$LOG_DIR/cron_launcher.log"

@@ -2,17 +2,13 @@
 # -*- coding: utf-8 -*-
 
 """
-player_team_data_build.py (AWS S3 Version)
+player_team_data_build.py (AWS S3 version)
 
-功能：
-  - 从 S3 下载 team_game_features.csv
-  - 从 S3 下载多个赛季的 player_logs_clean_season_xxx.csv
-  - 生成组合后的训练数据（例如 600 + team + opponent features）
-  - 输出为：nba_616_features.csv（保存在本地当前目录）
-
-注意：
-  - 所有路径都从 S3 读取
-  - EC2 中临时下载到 /tmp 目录
+Goal:
+  - Download team_game_features.csv from S3
+  - Download multiple seasons of player_logs_clean_season_xxx.csv from S3
+  - Build combined training data: player (600 dims) + team + opponent features
+  - Save as nba_616_features.csv in the current directory
 """
 
 import pandas as pd
@@ -24,7 +20,7 @@ from config_aws import S3_BUCKET, S3_PREFIX, AWS_REGION
 
 
 # ---------------------------
-# S3 设置
+# S3 paths
 # ---------------------------
 
 RAW_PREFIX = f"{S3_PREFIX}raw/"   # e.g. datasets/nba_project/raw/
@@ -37,17 +33,16 @@ PLAYER_FILES_S3 = [
     RAW_PREFIX + "player_logs_clean_season_202425.csv",
 ]
 
-
 s3 = boto3.client("s3", region_name=AWS_REGION)
 
 
 # ---------------------------
-# 下载工具函数
+# S3 download helper
 # ---------------------------
 
 def download_from_s3(s3_key: str) -> Path:
     """
-    下载 S3 文件到 /tmp，并返回本地路径。
+    Download S3 object to /tmp and return local path.
     """
     local_path = Path("/tmp") / Path(s3_key).name
     local_path.parent.mkdir(parents=True, exist_ok=True)
@@ -58,13 +53,12 @@ def download_from_s3(s3_key: str) -> Path:
 
 
 # ---------------------------
-# 读取数据
+# Load data
 # ---------------------------
 
 print("\n===== Loading TEAM features from S3 =====")
 team_local = download_from_s3(TEAM_FILE_S3)
 df_team = pd.read_csv(team_local)
-
 print(f"Loaded team_game_features.csv: {len(df_team)} rows")
 
 dfs = []
@@ -80,7 +74,7 @@ print(f"Total player logs: {len(df_player)} rows")
 
 
 # ---------------------------
-# 定义特征
+# Feature definitions
 # ---------------------------
 
 feature_cols = [
@@ -90,7 +84,7 @@ feature_cols = [
     "OREB", "DREB", "REB",
     "AST", "STL", "BLK",
     "TOV", "PF", "PTS",
-    "PLUS_MINUS"
+    "PLUS_MINUS",
 ]
 
 N_PER_TEAM = 15
@@ -108,23 +102,24 @@ TEAM_FEATURES = [
 
 
 # ---------------------------
-# 构建训练数据
+# Build training rows
 # ---------------------------
 
 rows = []
 
 
 def get_player_matrix(team_row):
-    """返回一个球队在一场比赛中的 15 名球员 × feature matrix"""
+    """
+    Return a (N_PER_TEAM x num_features) matrix for one team in one game.
+    """
     tid, gid = team_row["TEAM_ID"], team_row["GAME_ID"]
-    p = df_player[(df_player["TEAM_ID"] == tid) &
-                  (df_player["GAME_ID"] == gid)]
+    p = df_player[(df_player["TEAM_ID"] == tid) & (df_player["GAME_ID"] == gid)]
 
-    # 选前 15（按上场时间排序）
+    # Top N_PER_TEAM players by minutes
     p = p.sort_values("MIN", ascending=False).head(N_PER_TEAM)
     arr = p[feature_cols].to_numpy(float)
 
-    # 不足 15 人用 0 补齐
+    # Pad to N_PER_TEAM if fewer players
     if arr.shape[0] < N_PER_TEAM:
         pad = np.zeros((N_PER_TEAM - arr.shape[0], len(feature_cols)))
         arr = np.vstack([arr, pad])
@@ -135,24 +130,25 @@ def get_player_matrix(team_row):
 print("\n===== Building combined dataset =====")
 
 for game_id, team_group in df_team.groupby("GAME_ID"):
+    # Expect exactly home + away
     if len(team_group) != 2:
         continue
 
     team_A = team_group.iloc[0]
     team_B = team_group.iloc[1]
 
-    # 球员矩阵：shape = (15 players × features)
+    # Player matrices
     A_mat = get_player_matrix(team_A)
     B_mat = get_player_matrix(team_B)
 
-    # 展平 600 维
+    # Flatten player features (600 dims)
     player_flat = np.vstack([A_mat, B_mat]).flatten().tolist()
 
-    # team features
+    # Team-level features
     A_team = team_A[TEAM_FEATURES].fillna(0).tolist()
     B_team = team_B[TEAM_FEATURES].fillna(0).tolist()
 
-    # scores
+    # Targets (scores)
     score_A = team_A["PTS_FOR"]
     score_B = team_A["PTS_AGAINST"]
 
@@ -161,11 +157,11 @@ for game_id, team_group in df_team.groupby("GAME_ID"):
 
 
 # ---------------------------
-# 输出 CSV
+# Save CSV
 # ---------------------------
 
 columns = (
-    [f"f{i+1}" for i in range(PLAYER_INPUT_DIM)] +
+    [f"f{i + 1}" for i in range(PLAYER_INPUT_DIM)] +
     [f"A_{t}" for t in TEAM_FEATURES] +
     [f"B_{t}" for t in TEAM_FEATURES] +
     ["score_A", "score_B"]
@@ -176,6 +172,6 @@ df_out = pd.DataFrame(rows, columns=columns)
 output_path = Path("nba_616_features.csv")
 df_out.to_csv(output_path, index=False)
 
-print(f"\n===== DONE =====")
+print("\n===== DONE =====")
 print(f"Saved training dataset to: {output_path.resolve()}")
 print(f"Total samples: {len(df_out)}")

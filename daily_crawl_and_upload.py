@@ -207,23 +207,19 @@ def build_yesterday_games_from_players(df_players: pd.DataFrame) -> pd.DataFrame
     return games
 
 
-# ----------------- 2) Schedule (today + next 4 days) ----------------- #
-
 def fetch_schedule_for_date(game_date_la: date) -> pd.DataFrame:
     """
-    Fetch schedule for a given date using ScoreboardV2.
+    Fetch schedule for a single date using ScoreboardV2.
 
-    Input date is interpreted as an LA (PT) date; we pass the same calendar
-    date to NBA API. This is safe as long as the crawler runs after all
-    games of that calendar day have finished.
+    Rule:
+      - Keep any game that has valid HOME_TEAM_ID and VISITOR_TEAM_ID
+      - Do NOT try to guess/remove NBA Cup here
+      - If API truly has no games, return an empty DataFrame
 
     Output columns:
-      - GAME_DATE   (YYYY-MM-DD, based on GAME_DATE_EST from API)
-      - HOME_TEAM
-      - AWAY_TEAM
-      - HOME_TEAM_ID
-      - AWAY_TEAM_ID
-      - IS_TBD      (True if matchup is not fully determined)
+      - GAME_DATE  (YYYY-MM-DD, from GAME_DATE_EST)
+      - HOME_TEAM  (abbreviation)
+      - AWAY_TEAM  (abbreviation)
     """
     date_str_api = game_date_la.strftime("%m/%d/%Y")
     print(f"[schedule] Fetching schedule for {date_str_api} (LA-based date) ...")
@@ -240,45 +236,36 @@ def fetch_schedule_for_date(game_date_la: date) -> pd.DataFrame:
     print(f"[schedule] GameHeader rows={len(game_header)}")
 
     if game_header.empty:
-        return pd.DataFrame(columns=[
-            "GAME_DATE", "HOME_TEAM", "AWAY_TEAM",
-            "HOME_TEAM_ID", "AWAY_TEAM_ID", "IS_TBD"
-        ])
+        return pd.DataFrame(columns=["GAME_DATE", "HOME_TEAM", "AWAY_TEAM"])
 
     g = game_header[["GAME_DATE_EST", "HOME_TEAM_ID", "VISITOR_TEAM_ID"]].copy()
 
-    # Keep original IDs and detect TBD games
+    # Drop rows with missing team ids
+    g = g.dropna(subset=["HOME_TEAM_ID", "VISITOR_TEAM_ID"])
+
+    # Convert to int and map to team abbreviations
     g["HOME_TEAM_ID"] = pd.to_numeric(g["HOME_TEAM_ID"], errors="coerce")
     g["VISITOR_TEAM_ID"] = pd.to_numeric(g["VISITOR_TEAM_ID"], errors="coerce")
+    g = g.dropna(subset=["HOME_TEAM_ID", "VISITOR_TEAM_ID"])
 
-    # If either side is NaN, treat as TBD matchup
-    g["IS_TBD"] = g["HOME_TEAM_ID"].isna() | g["VISITOR_TEAM_ID"].isna()
+    if g.empty:
+        # API has no concrete matchups for this date
+        print("[schedule] No valid games with team IDs for this date.")
+        return pd.DataFrame(columns=["GAME_DATE", "HOME_TEAM", "AWAY_TEAM"])
 
-    # Map to team abbreviations where possible
+    g["HOME_TEAM_ID"] = g["HOME_TEAM_ID"].astype(int)
+    g["VISITOR_TEAM_ID"] = g["VISITOR_TEAM_ID"].astype(int)
+
     g["GAME_DATE"] = pd.to_datetime(g["GAME_DATE_EST"]).dt.strftime("%Y-%m-%d")
     g["HOME_TEAM"] = g["HOME_TEAM_ID"].map(TEAM_ID_TO_ABBR)
     g["AWAY_TEAM"] = g["VISITOR_TEAM_ID"].map(TEAM_ID_TO_ABBR)
 
-    # For TBD games, fill missing team abbr with 'TBD'
-    g.loc[g["IS_TBD"] & g["HOME_TEAM"].isna(), "HOME_TEAM"] = "TBD"
-    g.loc[g["IS_TBD"] & g["AWAY_TEAM"].isna(), "AWAY_TEAM"] = "TBD"
+    # Drop rows that cannot be mapped to one of the 30 NBA teams
+    g = g.dropna(subset=["HOME_TEAM", "AWAY_TEAM"])
 
-    # Drop truly broken rows (no date at all)
-    g = g.dropna(subset=["GAME_DATE"])
-
-    if g.empty:
-        print("[schedule] After cleaning, no games left for this date.")
-        return pd.DataFrame(columns=[
-            "GAME_DATE", "HOME_TEAM", "AWAY_TEAM",
-            "HOME_TEAM_ID", "AWAY_TEAM_ID", "IS_TBD"
-        ])
-
-    result = g[[
-        "GAME_DATE", "HOME_TEAM", "AWAY_TEAM",
-        "HOME_TEAM_ID", "VISITOR_TEAM_ID", "IS_TBD"
-    ]].copy()
-    result = result.rename(columns={"VISITOR_TEAM_ID": "AWAY_TEAM_ID"})
+    result = g[["GAME_DATE", "HOME_TEAM", "AWAY_TEAM"]].drop_duplicates().reset_index(drop=True)
     return result
+
 
 
 # ----------------- S3 upload helper ----------------- #

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import teams from "../data/teams";
 import PredictionModal from "./PredictionModal";
-import Modal from "./Modal";
+import teamAbbrevMap from "../data/teamMap";
 
 const API_KEY = import.meta.env.VITE_SPORTS_DATA_IO_KEY;
 
@@ -128,15 +128,15 @@ function GameGrid({ games }) {
 
     async function openWindow(game) {
         const game_date = game.Day?.split("T")[0];
-        const home_team = game.HomeTeam;
-        const away_team = game.AwayTeam;
+        const home_team = teamAbbrevMap[game.HomeTeam];
+        const away_team = teamAbbrevMap[game.AwayTeam];
 
         // show loading inside modal
         setSelectedDetail({ loading: true });
         setModalVisible(true);
 
         try {
-            const res = await fetch("http://3.101.69.200:8000/predict", {
+            const res = await fetch("http://3.101.57.240:8000/predict", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"

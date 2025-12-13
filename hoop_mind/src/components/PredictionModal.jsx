@@ -20,8 +20,8 @@ export default function PredictionModal({ visible, onClose, detail }) {
   const home = teams.find((t) => t.abbrev === detail.home_team) || {};
   const away = teams.find((t) => t.abbrev === detail.away_team) || {};
 
-  const homeRate = detail.home_win_prob;
-  const awayRate = detail.away_win_prob;
+  const homeRate = detail.pred_home_score;
+  const awayRate = detail.pred_away_score;
 
   return (
     <Modal visible={visible} onClose={onClose}>
@@ -75,7 +75,7 @@ export default function PredictionModal({ visible, onClose, detail }) {
 
         {/* ---------------- WIN RATE BAR ---------------- */}
         <div style={{ marginTop: 20 }}>
-          <p style={{ marginBottom: 8, fontSize: 16 }}>Win Probability</p>
+          <p style={{ marginBottom: 8, fontSize: 16 }}>Score Prediction</p>
 
           <div
             style={{
@@ -114,10 +114,10 @@ export default function PredictionModal({ visible, onClose, detail }) {
             }}
           >
             <span>
-              {away.abbrev}: <strong>{awayRate*100}%</strong>
+              {away.abbrev}: <strong>{awayRate}</strong>
             </span>
             <span>
-              {home.abbrev}: <strong>{homeRate*100}%</strong>
+              {home.abbrev}: <strong>{homeRate}</strong>
             </span>
           </div>
         </div>
